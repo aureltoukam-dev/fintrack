@@ -1,0 +1,64 @@
+import { create } from 'zustand';
+import * as SQLite from 'expo-sqlite';
+import { Transaction } from '../db/schema';
+import {
+  addTransaction,
+  updateTransaction,
+  deleteTransaction,
+  getTransactions,
+  getPeriodStats,
+  getCategoryStats,
+} from '../db/queries';
+
+interface TransactionFilters {
+  type?: 'income' | 'expense';
+  categoryId?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+}
+
+interface TransactionStore {
+  transactions: Transaction[];
+  isLoaded: boolean;
+  loadTransactions: (db: SQLite.SQLiteDatabase, filters?: TransactionFilters) => void;
+  addTransaction: (db: SQLite.SQLiteDatabase, data: Omit<Transaction, 'id' | 'createdAt'>) => Transaction;
+  updateTransaction: (db: SQLite.SQLiteDatabase, id: string, data: Partial<Transaction>) => void;
+  deleteTransaction: (db: SQLite.SQLiteDatabase, id: string) => void;
+  getPeriodStats: (db: SQLite.SQLiteDatabase, startDate: string, endDate: string) => { income: number; expense: number };
+  getCategoryStats: (db: SQLite.SQLiteDatabase, startDate: string, endDate: string) => { categoryId: string; total: number }[];
+}
+
+export const useTransactionStore = create<TransactionStore>((set, get) => ({
+  transactions: [],
+  isLoaded: false,
+
+  loadTransactions: (db, filters) => {
+    const txs = getTransactions(db, filters);
+    set({ transactions: txs, isLoaded: true });
+  },
+
+  addTransaction: (db, data) => {
+    const tx = addTransaction(db, data);
+    get().loadTransactions(db);
+    return tx;
+  },
+
+  updateTransaction: (db, id, data) => {
+    updateTransaction(db, id, data);
+    get().loadTransactions(db);
+  },
+
+  deleteTransaction: (db, id) => {
+    deleteTransaction(db, id);
+    get().loadTransactions(db);
+  },
+
+  getPeriodStats: (db, startDate, endDate) => {
+    return getPeriodStats(db, startDate, endDate);
+  },
+
+  getCategoryStats: (db, startDate, endDate) => {
+    return getCategoryStats(db, startDate, endDate, 'expense');
+  },
+}));

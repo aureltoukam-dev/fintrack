@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+dist/
+build/
+android/build/
+android/.gradle/
+ios/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+expo-env.d.ts

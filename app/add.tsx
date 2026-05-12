@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ScrollView, Alert, Animated,
@@ -32,7 +32,7 @@ export default function AddScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [numPadVisible, setNumPadVisible] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
-  const toastAnim = new Animated.Value(0);
+  const toastAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadSettings(db);

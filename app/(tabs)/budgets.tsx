@@ -53,6 +53,7 @@ export default function BudgetsScreen() {
     setAddModal(false);
     setAmount('');
     setEditId(null);
+    Alert.alert('', editId ? 'Budget modifié ✓' : 'Budget créé ✓', [{ text: 'OK' }]);
   };
 
   return (

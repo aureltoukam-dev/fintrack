@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity,
   TextInput, ScrollView, Modal, Alert, RefreshControl,
@@ -40,6 +40,8 @@ export default function TransactionsScreen() {
   const router = useRouter();
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -54,21 +56,27 @@ export default function TransactionsScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadTransactions(db);
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 0);
+  }, []);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearch(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedSearch(text), 250);
   }, []);
 
   const filtered = useMemo(() => {
     let result = [...transactions];
     if (filterType !== 'all') result = result.filter(t => t.type === filterType);
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       result = result.filter(t => {
         const cat = getCategoryById(t.categoryId);
         return (t.note?.toLowerCase().includes(q) || cat?.name.toLowerCase().includes(q));
       });
     }
     return result;
-  }, [transactions, filterType, search]);
+  }, [transactions, filterType, debouncedSearch]);
 
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
   const currencySymbol = getCurrencySymbol();
@@ -97,10 +105,10 @@ export default function TransactionsScreen() {
           placeholder="Rechercher..."
           placeholderTextColor={C.text3}
           value={search}
-          onChangeText={setSearch}
+          onChangeText={handleSearchChange}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
+          <TouchableOpacity onPress={() => { setSearch(''); setDebouncedSearch(''); }}>
             <Feather name="x" size={16} color={C.text3} />
           </TouchableOpacity>
         )}
@@ -126,11 +134,19 @@ export default function TransactionsScreen() {
         sections={sections}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-          </View>
-        )}
+        renderSectionHeader={({ section }) => {
+          const dayIncome = section.data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+          const dayExpense = section.data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+          const dayNet = dayIncome - dayExpense;
+          return (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={[styles.sectionNet, { color: dayNet >= 0 ? C.accent2 : C.danger }]}>
+                {dayNet >= 0 ? '+' : ''}{dayNet.toLocaleString('fr-FR')} {currencySymbol}
+              </Text>
+            </View>
+          );
+        }}
         renderItem={({ item }) => {
           const cat = getCategoryById(item.categoryId);
           return cat ? (
@@ -171,7 +187,11 @@ export default function TransactionsScreen() {
               <Text style={styles.sheetAmount}>
                 {selectedTx.type === 'expense' ? '−' : '+'}{currencySymbol} {selectedTx.amount.toLocaleString('fr-FR')}
               </Text>
-              <Text style={styles.sheetDate}>{selectedTx.date}</Text>
+              <Text style={styles.sheetDate}>
+                {new Date(selectedTx.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </Text>
               <TouchableOpacity
                 style={styles.sheetBtn}
                 onPress={() => {
@@ -214,8 +234,9 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: C.accent },
   chipText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
   chipTextActive: { color: '#FFF' },
-  sectionHeader: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, backgroundColor: C.bg },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, backgroundColor: C.bg },
   sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
+  sectionNet: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
   empty: { textAlign: 'center', color: C.text2, fontFamily: T.fonts.body, padding: SPACING.xl },
   fab: {
     position: 'absolute', bottom: 24, right: 24,

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Rect, Text as SvgText, Line } from 'react-native-svg';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import Svg, { G, Rect, Text as SvgText, Line } from 'react-native-svg';
 
 interface BarChartProps {
   data: { month: string; income: number; expense: number }[];
@@ -9,7 +9,8 @@ interface BarChartProps {
 
 const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
   const chartHeight = height;
-  const chartWidth = 300; // Fixed width for simplicity, adjust as needed
+  const screenWidth = Dimensions.get('window').width;
+  const chartWidth = screenWidth - 64; // 32px padding each side
   const barWidth = 15;
   const groupSpacing = 30;
   const legendHeight = 40;
@@ -126,10 +127,10 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
         />
 
         {/* Grid Lines */}
-        <g transform="translate(20, 20)"> {/* Padding for grid */}
+        <G transform="translate(20, 20)">
           {gridLines}
           {bars}
-        </g>
+        </G>
 
         {/* Y-axis labels (optional, for reference) */}
         <SvgText x="5" y="25" fill={labelColor} fontSize="10">MAX</SvgText>

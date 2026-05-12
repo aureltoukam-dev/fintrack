@@ -6,7 +6,9 @@ import { useFonts } from 'expo-font';
 import { Sora_400Regular, Sora_600SemiBold } from '@expo-google-fonts/sora';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { openDatabase, runMigrations } from '../db/migrations';
+import { seedDatabase } from '../db/seed';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,6 +23,7 @@ export default function RootLayout() {
     try {
       const db = openDatabase();
       runMigrations(db);
+      seedDatabase(db);
     } catch (e) {
       console.error('DB init error:', e);
     }
@@ -36,6 +39,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <ErrorBoundary>
       <StatusBar style="light" backgroundColor="#0F0F14" />
       <Stack
         screenOptions={{
@@ -56,6 +60,7 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+    </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

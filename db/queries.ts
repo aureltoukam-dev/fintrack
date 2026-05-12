@@ -116,7 +116,17 @@ export const getTransactionById = (db: SQLite.SQLiteDatabase, id: string): Trans
 // --- Budgets ---
 export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>): Budget => {
   const { categoryId, limit, month } = budget;
-  const existing = getBudgetByCategoryId(db, categoryId);
+  const monthVal = month ?? null;
+  // Check if a budget already exists for this category+month combination
+  const existing = monthVal
+    ? (db.getFirstSync(
+        'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ? AND month = ?',
+        [categoryId, monthVal]
+      ) as Budget | null)
+    : (db.getFirstSync(
+        'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ? AND month IS NULL',
+        [categoryId]
+      ) as Budget | null);
   if (existing) {
     updateBudget(db, existing.id, limit);
     return { ...existing, limit };
@@ -124,9 +134,9 @@ export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>)
   const id = uuidv4();
   db.runSync(
     'INSERT INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
-    [id, categoryId, limit, month ?? null]
+    [id, categoryId, limit, monthVal]
   );
-  return { id, categoryId, limit, month };
+  return { id, categoryId, limit, month: monthVal ?? undefined };
 };
 
 export const updateBudget = (db: SQLite.SQLiteDatabase, id: string, limit: number): void => {
@@ -137,16 +147,33 @@ export const deleteBudget = (db: SQLite.SQLiteDatabase, id: string): void => {
   db.runSync('DELETE FROM budgets WHERE id = ?', [id]);
 };
 
-export const getBudgets = (db: SQLite.SQLiteDatabase): Budget[] => {
-  const rows = db.getAllSync(
-    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets ORDER BY categoryId ASC'
+// Returns budgets for a given month + recurring budgets (month IS NULL)
+// If monthKey is null, returns all budgets
+export const getBudgets = (db: SQLite.SQLiteDatabase, monthKey?: string | null): Budget[] => {
+  if (monthKey) {
+    // Recurring OR specific to this month — prefer specific over recurring per category
+    const rows = db.getAllSync(
+      `SELECT id, categoryId, limit_amount as "limit", month FROM budgets
+       WHERE month IS NULL OR month = ?
+       ORDER BY categoryId ASC, month DESC`,
+      [monthKey]
+    ) as Budget[];
+    // Deduplicate: if both recurring and monthly exist, keep the monthly one
+    const seen = new Set<string>();
+    return rows.filter(b => {
+      if (seen.has(b.categoryId)) return false;
+      seen.add(b.categoryId);
+      return true;
+    });
+  }
+  return db.getAllSync(
+    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets ORDER BY categoryId ASC, month ASC'
   ) as Budget[];
-  return rows;
 };
 
 export const getBudgetByCategoryId = (db: SQLite.SQLiteDatabase, categoryId: string): Budget | null => {
   const row = db.getFirstSync(
-    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ?',
+    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ? AND month IS NULL',
     [categoryId]
   ) as Budget | null;
   return row;

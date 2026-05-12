@@ -7,14 +7,13 @@ import { useRouter } from 'expo-router';
 import { openDatabase } from '../../db/migrations';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { getPeriodDates, getBarSlicesForPeriod } from '../../services/periodFilter';
+import { getOffsetPeriodDates, getBarSlicesForPeriod } from '../../services/periodFilter';
 import { CATEGORIES } from '../../constants/categories';
 import BalanceCard from '../../components/BalanceCard';
-import PeriodSelector from '../../components/PeriodSelector';
+import PeriodNavigator from '../../components/PeriodNavigator';
 import BarChart from '../../components/BarChart';
 import DonutChart from '../../components/DonutChart';
 import TransactionItem from '../../components/TransactionItem';
-import { PeriodType } from '../../db/schema';
 import { useTheme, SPACING, TYPOGRAPHY as T } from '../../constants/theme';
 
 const db = openDatabase();
@@ -35,7 +34,8 @@ export default function DashboardScreen() {
     fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', shadowColor: C.accent, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
   }), [C]);
   const router = useRouter();
-  const [period, setPeriod] = useState<Exclude<PeriodType, 'custom'>>('month');
+  const [periodType, setPeriodType] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  const [periodOffset, setPeriodOffset] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const { transactions, loadTransactions, getPeriodStats, getCategoryStats } = useTransactionStore();
@@ -52,7 +52,10 @@ export default function DashboardScreen() {
     setTimeout(() => setRefreshing(false), 0);
   }, []);
 
-  const { startDate, endDate, label: periodLabel } = getPeriodDates(period);
+  const { startDate, endDate, label: periodLabel } = useMemo(
+    () => getOffsetPeriodDates(periodType, periodOffset),
+    [periodType, periodOffset]
+  );
   const currencySymbol = getCurrencySymbol();
 
   const stats = useMemo(
@@ -66,12 +69,12 @@ export default function DashboardScreen() {
   );
 
   const barData = useMemo(() => {
-    const slices = getBarSlicesForPeriod(period);
+    const slices = getBarSlicesForPeriod(periodType);
     return slices.map(slice => {
       const s = getPeriodStats(db, slice.start, slice.end);
       return { label: slice.label, income: s.income, expense: s.expense };
     });
-  }, [period, transactions]);
+  }, [periodType, transactions]);
 
   const donutData = useMemo(() => categoryStats.slice(0, 5).map(cs => {
     const cat = CATEGORIES.find(c => c.id === cs.categoryId);
@@ -105,8 +108,15 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Period Selector */}
-      <PeriodSelector selected={period} onSelect={(p) => { if (p !== 'all') setPeriod(p as Exclude<PeriodType, 'custom'>); }} />
+      {/* Period Navigator */}
+      <PeriodNavigator
+        periodType={periodType}
+        offset={periodOffset}
+        label={periodLabel}
+        onPeriodTypeChange={(t) => { if (t !== 'all') { setPeriodType(t as any); setPeriodOffset(0); } }}
+        onOffsetChange={setPeriodOffset}
+        showAll={false}
+      />
 
       {/* Balance Card */}
       <View style={styles.section}>
@@ -122,9 +132,9 @@ export default function DashboardScreen() {
       {/* Bar Chart */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          {period === 'week' ? 'Flux de la semaine (par jour)' :
-           period === 'month' ? 'Flux du mois (par semaine)' :
-           period === 'quarter' ? 'Flux du trimestre (par mois)' :
+          {periodType === 'week' ? 'Flux de la semaine (par jour)' :
+           periodType === 'month' ? 'Flux du mois (par semaine)' :
+           periodType === 'quarter' ? 'Flux du trimestre (par mois)' :
            'Flux de l\'année (par mois)'}
         </Text>
         <BarChart data={barData} />

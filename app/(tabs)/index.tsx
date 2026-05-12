@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity,
   RefreshControl, ActivityIndicator,
@@ -33,26 +33,36 @@ export default function DashboardScreen() {
     loadTransactions(db);
   }, []);
 
-  const onRefresh = useCallback(async () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadTransactions(db);
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 0);
   }, []);
 
   const { startDate, endDate, label: periodLabel } = getPeriodDates(period);
-  const stats = getPeriodStats(db, startDate, endDate);
-  const categoryStats = getCategoryStats(db, startDate, endDate);
   const currencySymbol = getCurrencySymbol();
 
-  const last6 = getLast6Months();
-  const barData = last6.map(({ monthNum, year, label }) => {
-    const start = `${year}-${monthNum}-01`;
-    const end = `${year}-${monthNum}-31`;
-    const s = getPeriodStats(db, start, end);
-    return { month: label, income: s.income, expense: s.expense };
-  });
+  const stats = useMemo(
+    () => getPeriodStats(db, startDate, endDate),
+    [startDate, endDate, transactions]
+  );
 
-  const donutData = categoryStats.slice(0, 5).map(cs => {
+  const categoryStats = useMemo(
+    () => getCategoryStats(db, startDate, endDate),
+    [startDate, endDate, transactions]
+  );
+
+  const barData = useMemo(() => {
+    const last6 = getLast6Months();
+    return last6.map(({ monthNum, year, label }) => {
+      const start = `${year}-${monthNum}-01`;
+      const end = `${year}-${monthNum}-31`;
+      const s = getPeriodStats(db, start, end);
+      return { month: label, income: s.income, expense: s.expense };
+    });
+  }, [transactions]);
+
+  const donutData = useMemo(() => categoryStats.slice(0, 5).map(cs => {
     const cat = CATEGORIES.find(c => c.id === cs.categoryId);
     return {
       categoryId: cs.categoryId,
@@ -61,10 +71,14 @@ export default function DashboardScreen() {
       amount: cs.total,
       color: cat?.color ?? '#9896B0',
     };
-  });
-  const donutTotal = categoryStats.reduce((s, cs) => s + cs.total, 0);
+  }), [categoryStats]);
 
-  const recentTransactions = [...transactions].slice(0, 5);
+  const donutTotal = useMemo(
+    () => categoryStats.reduce((s, cs) => s + cs.total, 0),
+    [categoryStats]
+  );
+
+  const recentTransactions = useMemo(() => [...transactions].slice(0, 5), [transactions]);
 
   return (
     <ScrollView

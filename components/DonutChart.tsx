@@ -1,6 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated } from 'react-native';
-import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Text, Animated } from 'react-native';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 interface DonutChartProps {
   data: { categoryId: string; label: string; icon: string; amount: number; color: string }[];
@@ -8,7 +10,7 @@ interface DonutChartProps {
   currencySymbol?: string;
 }
 
-const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
+const DonutChart: React.FC<DonutChartProps> = ({ data, total, currencySymbol = '' }) => {
   const containerWidth = 300; // Fixed width for the container
   const svgSize = containerWidth * 0.8; // SVG will be smaller than container
   const radius = svgSize / 2;
@@ -90,17 +92,6 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
       outputRange: [centerY + innerRadius * Math.sin(startRad), centerY + innerRadius * Math.sin(endRad)],
     });
 
-    // This is a simplified approach. For true animated path drawing,
-    // you'd need to dynamically update the path string based on the animated value.
-    // A common technique is to use a dummy path and animate its length or end point.
-    // For this example, we'll animate the opacity or a placeholder.
-    // A more robust animation would involve interpolating the path string itself,
-    // which is complex. Let's use a simpler animation for demonstration.
-
-    // We'll animate the opacity of the path for a fade-in effect,
-    // or use a dummy path and animate its length.
-    // For simplicity, let's animate the opacity.
-
     return `M ${innerStartX} ${innerStartY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} L ${innerEndX} ${innerEndY} A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStartX} ${innerStartY} Z`;
   };
 
@@ -140,8 +131,8 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
     }
   }, [data, total, hasData]);
 
-  const renderLegendItem = ({ item }: { item: typeof finalData[0] }) => (
-    <View style={styles.legendItem}>
+  const renderLegendItem = (item: typeof finalData[0]) => (
+    <View key={item.categoryId} style={styles.legendItem}>
       <View style={[styles.legendIcon, { backgroundColor: item.color }]} />
       <Text style={[styles.legendLabel, { color: textColor }]}>{item.label}</Text>
       <Text style={[styles.legendPercentage, { color: labelColor }]}>{item.percentage.toFixed(1)}%</Text>
@@ -164,28 +155,19 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
       );
     }
 
-    const paths = pathData.map((item, index) => {
-      // For animation, we'll use a dummy path and animate its opacity or a placeholder.
-      // A true animated path requires complex string interpolation.
-      // Here, we'll use the calculated path and animate opacity.
-      const AnimatedPath = Animated.createAnimatedComponent(Path);
-      return (
-        <AnimatedPath
-          key={item.categoryId}
-          d={item.path}
-          fill={item.color}
-          strokeWidth={strokeWidth}
-          stroke={backgroundColor} // Stroke to create the donut effect
-          strokeOpacity={animatedPaths[index]?.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          })}
-          // For a more accurate path animation, you'd need to dynamically generate 'd'
-          // based on the animated value, which is significantly more complex.
-          // This opacity animation provides a fade-in effect.
-        />
-      );
-    });
+    const paths = pathData.map((item, index) => (
+      <AnimatedPath
+        key={item.categoryId}
+        d={item.path}
+        fill={item.color}
+        strokeWidth={strokeWidth}
+        stroke={backgroundColor}
+        opacity={animatedPaths[index]?.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 1],
+        })}
+      />
+    ));
 
     return (
       <>
@@ -196,10 +178,10 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
           y={(centerY - 10).toString()}
           textAnchor="middle"
           fill={textColor}
-          fontSize="20"
-          fontFamily="SpaceMono-Regular" // Ensure you have this font available
+          fontSize="18"
+          fontFamily="SpaceMono-Regular"
         >
-          {total.toFixed(2)}
+          {total.toLocaleString('fr-FR')} {currencySymbol}
         </SvgText>
         <SvgText
           x={centerX.toString()}
@@ -221,12 +203,7 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
       </Svg>
 
       <View style={styles.legendContainer}>
-        <FlatList
-          data={finalData}
-          renderItem={renderLegendItem}
-          keyExtractor={(item) => item.categoryId}
-          showsVerticalScrollIndicator={false}
-        />
+        {finalData.map(renderLegendItem)}
       </View>
     </View>
   );

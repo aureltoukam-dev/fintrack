@@ -1,0 +1,651 @@
+================================================================================
+  AUDIT COMPLET — FINTRACK v1.0.0
+  Date : 12 mai 2026
+  Périmètre : Application mobile React Native / Expo SDK 54
+  Auditeur : Claude Sonnet 4.6 (agent review)
+================================================================================
+
+TABLE DES MATIÈRES
+  1. BUGS CRITIQUES (bloquants)
+  2. BUGS MINEURS (dégradation fonctionnelle)
+  3. MANQUES FONCTIONNELS
+  4. PROBLÈMES D'ARCHITECTURE
+  5. PROBLÈMES DE PERFORMANCE
+  6. PROBLÈMES DE SÉCURITÉ
+  7. PROBLÈMES UX / DESIGN
+  8. DETTE TECHNIQUE
+  9. PLAN DE CORRECTION PRIORITAIRE
+
+================================================================================
+1. BUGS CRITIQUES
+================================================================================
+
+[BC-01] toastAnim recréé à chaque render — app/add.tsx:35
+------------------------------------------------------------------------
+CODE PROBLÉMATIQUE :
+  const toastAnim = new Animated.Value(0);   // EN DEHORS de useRef
+
+IMPACT : Chaque re-render (frappe dans un champ, toggle de catégorie) recrée
+un nouvel Animated.Value à zéro. L'animation du toast se réinitialise à
+chaque frappe et ne fonctionnera jamais correctement en cours de saisie.
+
+CORRECTION :
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+------------------------------------------------------------------------
+
+[BC-02] handleReset ne recharge pas les stores — app/(tabs)/settings.tsx:75-79
+------------------------------------------------------------------------
+CODE PROBLÉMATIQUE :
+  const handleReset = () => {
+    db.runSync('DELETE FROM transactions');
+    db.runSync('DELETE FROM budgets');
+    Alert.alert('Réinitialisation', '...');
+    setResetModal(false);
+    // MANQUE : reload des stores Zustand
+  };
+
+IMPACT : Après la suppression, les stores Zustand en mémoire
+(useTransactionStore, useBudgetStore) conservent leurs anciennes données.
+L'UI continue d'afficher les transactions et budgets supprimés jusqu'au
+prochain redémarrage de l'application. L'utilisateur pense avoir réinitialisé
+mais les données restent visibles.
+
+CORRECTION : Appeler loadTransactions(db) et loadBudgets(db) après la
+suppression, ou utiliser un store reset action.
+
+------------------------------------------------------------------------
+
+[BC-03] spinner pull-to-refresh jamais visible — index.tsx:36-40, transactions.tsx:54-58
+------------------------------------------------------------------------
+CODE PROBLÉMATIQUE :
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    loadTransactions(db);   // SYNCHRONE (expo-sqlite v16 sync API)
+    setRefreshing(false);   // exécuté avant le re-render
+  }, []);
+
+IMPACT : loadTransactions est synchrone. React batchera les deux setState
+(true puis false) en un seul render, donc refreshing ne passera jamais à true
+visuellement. Le spinner de pull-to-refresh n'apparaît jamais.
+
+CORRECTION : Wraper dans setTimeout 0 ou utiliser une promesse factice :
+  setRefreshing(true);
+  loadTransactions(db);
+  setTimeout(() => setRefreshing(false), 0);
+
+------------------------------------------------------------------------
+
+[BC-04] 15 requêtes SQL synchrones à chaque render du Dashboard — index.tsx:43-53
+------------------------------------------------------------------------
+CODE PROBLÉMATIQUE :
+  // Exécuté à CHAQUE render, pas dans useMemo
+  const stats = getPeriodStats(db, startDate, endDate);      // 2 queries
+  const categoryStats = getCategoryStats(db, startDate, endDate);  // 1 query
+  const barData = last6.map(({ monthNum, year, label }) => {
+    const s = getPeriodStats(db, start, end);                // 2 queries × 6 = 12
+    ...
+  });
+
+TOTAL : 2 + 1 + 12 = 15 requêtes SQL synchrones sur le thread JS à chaque
+render du DashboardScreen.
+
+IMPACT : Tout setState (scroll, refresh, period change) déclenchera 15 DB
+reads synchrones bloquant le thread JS. Sur un appareil d'entrée de gamme
+avec plusieurs centaines de transactions, cela causera des freezes visibles.
+
+CORRECTION : Envelopper dans useMemo avec [period, transactions] comme deps.
+
+------------------------------------------------------------------------
+
+[BC-05] Table 'categories' jamais créée — db/migrations.ts vs db/queries.ts
+------------------------------------------------------------------------
+CONSTAT : db/migrations.ts crée les tables : transactions, budgets, settings.
+Mais db/queries.ts contient les fonctions addCategory(), getCategories(),
+updateCategory(), deleteCategory() qui font des requêtes sur une table
+'categories' qui n'existe PAS.
+
+IMPACT : Si ces fonctions sont appelées (ex: import depuis un JSON), l'app
+crash avec "no such table: categories".
+
+CORRECTION : Soit ajouter la table dans runMigrations(), soit supprimer les
+fonctions mortes de queries.ts.
+
+------------------------------------------------------------------------
+
+[BC-06] Animation SVG Path dans DonutChart — effet incorrect — DonutChart.tsx:171-188
+------------------------------------------------------------------------
+CODE PROBLÉMATIQUE :
+  <AnimatedPath
+    d={item.path}           // path statique (pas animé)
+    fill={item.color}
+    strokeOpacity={animatedPaths[index]?.interpolate({ ... })}
+    // strokeOpacity anime la BORDURE, pas le fill
+  />
+
+IMPACT : L'animation voulue est un "fade-in" mais strokeOpacity n'affecte que
+le trait de bordure (qui sert à créer l'espacement entre segments). Le fill
+du segment est immédiatement visible à 100%. De plus, AnimatedPath est recréé
+à chaque render de renderSvgContent car la variable est déclarée à l'intérieur.
+
+CORRECTION : Utiliser `opacity` au lieu de `strokeOpacity`, et déplacer
+AnimatedPath = Animated.createAnimatedComponent(Path) à l'extérieur du
+composant.
+
+------------------------------------------------------------------------
+
+[BC-07] Appel addBudget avec INSERT OR REPLACE change l'ID à chaque fois — db/queries.ts:191-199
+------------------------------------------------------------------------
+CODE PROBLÉMATIQUE :
+  export const addBudget = (db, budget) => {
+    const id = uuidv4();  // Nouvel ID à chaque appel
+    db.runSync(
+      'INSERT OR REPLACE INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
+      [id, categoryId, limit, month ?? null]
+    );
+    return { id, categoryId, limit, month };
+  };
+
+IMPACT : La contrainte UNIQUE est sur categoryId. Si on ajoute un budget pour
+une catégorie déjà existante, SQLite supprime l'ancien enregistrement et en
+crée un nouveau avec un ID différent. Perte de l'ID original sans warning.
+Mieux vaut utiliser INSERT OR IGNORE + UPDATE séparé, ou vérifier en amont.
+
+------------------------------------------------------------------------
+
+================================================================================
+2. BUGS MINEURS
+================================================================================
+
+[BM-01] currencySymbol ignoré dans DonutChart — DonutChart.tsx:11, index.tsx:106
+------------------------------------------------------------------------
+La prop currencySymbol est déclarée dans l'interface DonutChartProps mais
+absente des paramètres destructurés du composant :
+  const DonutChart: React.FC<DonutChartProps> = ({ data, total }) => {
+Le centre du donut affiche "78500.00" sans unité monétaire.
+
+------------------------------------------------------------------------
+
+[BM-02] Formatage incohérent des montants dans DonutChart — DonutChart.tsx:203
+------------------------------------------------------------------------
+  {total.toFixed(2)}   // Affiche "78500.00"
+Les autres parties de l'app utilisent toLocaleString('fr-FR') qui donne
+"78 500". En XAF les décimales sont inutiles. Absence de formatter centralisé.
+
+------------------------------------------------------------------------
+
+[BM-03] Date brute dans le modal de détail — transactions.tsx:174
+------------------------------------------------------------------------
+  <Text style={styles.sheetDate}>{selectedTx.date}</Text>
+Affiche "2026-05-01" au lieu de "Vendredi 1 mai 2026". L'app formate les
+dates partout ailleurs (groupByDate, add.tsx datePicker) mais pas ici.
+
+------------------------------------------------------------------------
+
+[BM-04] Fin de mois hardcodée à 31 — index.tsx:50, periodFilter.ts
+------------------------------------------------------------------------
+  const end = `${year}-${monthNum}-31`;
+Fonctionne avec SQLite (comparaison de strings) car '2026-02-31' > toutes
+les dates de février, mais sémantiquement incorrect. Pourrait causer des
+problèmes si la logique est réutilisée côté JS (new Date('2026-02-31') → NaN).
+
+------------------------------------------------------------------------
+
+[BM-05] Catégorie par défaut "food" lors du basculement income/expense — add.tsx:86,91
+------------------------------------------------------------------------
+  onPress={() => { setType('expense'); setCategoryId('food'); }}
+  onPress={() => { setType('income'); setCategoryId('salary'); }}
+Si l'utilisateur sélectionne une catégorie puis change le type rapidement
+deux fois, il peut revenir à une catégorie incohérente avec le type.
+
+------------------------------------------------------------------------
+
+[BM-06] Budget — catégorie 'salary' incluse dans les filtres — budgets.tsx:36
+------------------------------------------------------------------------
+  const expenseCategories = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both');
+Correct si salary n'est pas de type 'both'. Mais l'inclusion de 'both' peut
+inclure des catégories inattendues selon la définition dans constants/categories.ts.
+
+------------------------------------------------------------------------
+
+[BM-07] `getSetting` écrase silencieusement avec UPDATE sans INSERT — db/queries.ts:230-232
+------------------------------------------------------------------------
+  export const setSetting = (db, key, value) => {
+    db.runSync('UPDATE settings SET value = ? WHERE key = ?', [value, key]);
+  };
+Si la clé n'existe pas (ex: 'reminderTime' jamais inséré dans les defaults),
+UPDATE ne fera rien sans erreur. La valeur sera perdue silencieusement.
+Utiliser INSERT OR REPLACE ou UPSERT.
+
+------------------------------------------------------------------------
+
+[BM-08] Pas d'index sur createdAt — migrations.ts
+------------------------------------------------------------------------
+La table transactions n'a pas d'index sur createdAt alors que les
+requêtes de tri utilisent date DESC. Avec un grand volume de données,
+les requêtes ORDER BY pourraient être lentes.
+
+------------------------------------------------------------------------
+
+================================================================================
+3. MANQUES FONCTIONNELS
+================================================================================
+
+[MF-01] AUCUN TEST — ni unitaire, ni intégration, ni e2e
+------------------------------------------------------------------------
+Constat : Le projet ne contient aucun fichier de test (*.test.ts, *.spec.ts),
+aucun jest.config.js, aucune configuration testing-library.
+
+Couverture zéro sur :
+  - Logique métier (getBudgetProgress, groupByDate, periodFilter)
+  - Requêtes SQL (queries.ts)
+  - Stores Zustand
+  - Composants UI
+  - Services (export, notifications)
+
+RISQUE : Chaque modification peut casser une fonctionnalité existante sans
+être détectée avant le test manuel en device.
+
+------------------------------------------------------------------------
+
+[MF-02] Thème clair / automatique — sauvegardé mais jamais appliqué
+------------------------------------------------------------------------
+L'UI propose 3 thèmes (Sombre, Clair, Automatique). Le choix est persisté
+en BD. Mais l'app utilise toujours DARK_COLORS partout. Aucune logique de
+theming dynamique n'est implémentée.
+
+------------------------------------------------------------------------
+
+[MF-03] Export CSV absent de l'UI
+------------------------------------------------------------------------
+Le service exportService.ts propose potentiellement une fonction CSV mais
+elle n'est pas accessible. L'UI ne propose que JSON. Le CSV est le format
+standard pour les données financières (Excel, banques).
+
+------------------------------------------------------------------------
+
+[MF-04] Aucun filtre par catégorie dans la liste des transactions
+------------------------------------------------------------------------
+Seuls "Tout / Dépenses / Revenus" sont disponibles. Impossible de voir
+uniquement les transactions "Alimentation" ou "Transport".
+
+------------------------------------------------------------------------
+
+[MF-05] Aucun filtre par plage de dates dans les transactions
+------------------------------------------------------------------------
+Toutes les transactions de toute la vie de l'app sont chargées. Pas de
+filtre "Ce mois", "Les 30 derniers jours", "Choisir une période".
+
+------------------------------------------------------------------------
+
+[MF-06] Aucune pagination — chargement de toutes les transactions
+------------------------------------------------------------------------
+getTransactions() sans LIMIT/OFFSET charge TOUTES les transactions en
+mémoire. Sur 2 ans de données (730+ transactions), la mémoire et le
+rendu de la liste deviennent problématiques.
+
+------------------------------------------------------------------------
+
+[MF-07] Heure de rappel quotidien non configurable
+------------------------------------------------------------------------
+La schema.ts prévoit `reminderTime?: string` et les notifications sont
+configurées mais l'UI n'expose aucun sélecteur d'heure. L'utilisateur
+peut activer les rappels mais pas choisir l'heure.
+
+------------------------------------------------------------------------
+
+[MF-08] Catégories personnalisées — CRUD jamais implémenté côté UI
+------------------------------------------------------------------------
+queries.ts dispose de addCategory, updateCategory, deleteCategory mais
+aucun écran ne les utilise. Impossible d'ajouter ses propres catégories.
+
+------------------------------------------------------------------------
+
+[MF-09] Aucun écran statistiques dédié
+------------------------------------------------------------------------
+Les stats sont cantonnées au dashboard. Pas de vue dédiée avec :
+  - Évolution mensuelle sur 12 mois
+  - Top 3 catégories de dépenses
+  - Comparaison mois courant vs mois précédent
+  - Taux d'épargne
+
+------------------------------------------------------------------------
+
+[MF-10] Budget — aucune navigation vers les transactions de la catégorie
+------------------------------------------------------------------------
+En cliquant sur un budget, on peut seulement modifier la limite.
+Pas de "voir les transactions de cette catégorie ce mois".
+
+------------------------------------------------------------------------
+
+[MF-11] Budget — pas de détection de doublon avec feedback utilisateur
+------------------------------------------------------------------------
+Si l'utilisateur tente d'ajouter un budget pour une catégorie qui en a
+déjà un, INSERT OR REPLACE écrase silencieusement sans avertir l'utilisateur.
+
+------------------------------------------------------------------------
+
+[MF-12] Import JSON — aucune validation de format
+------------------------------------------------------------------------
+importFromJSON accepte n'importe quel fichier. Si le JSON est malformé
+ou d'un format différent, le crash sera non géré avec une erreur cryptique.
+
+------------------------------------------------------------------------
+
+[MF-13] Aucun onboarding / écran de bienvenue
+------------------------------------------------------------------------
+À la première ouverture, l'utilisateur voit un dashboard vide sans
+guidance. Pas de :
+  - Configuration initiale (prénom, devise)
+  - Explication des fonctionnalités
+  - CTA pour créer la première transaction
+
+------------------------------------------------------------------------
+
+[MF-14] Pas de code PIN ou authentification biométrique
+------------------------------------------------------------------------
+App de gestion financière sans aucune protection locale. N'importe qui
+avec le téléphone en main peut accéder à toutes les données.
+
+------------------------------------------------------------------------
+
+[MF-15] Total journalier absent dans la liste des transactions
+------------------------------------------------------------------------
+Chaque groupe de date (section header) n'affiche pas le total des
+entrées/sorties de la journée. Pratique courante dans toutes les apps fintech.
+
+------------------------------------------------------------------------
+
+================================================================================
+4. PROBLÈMES D'ARCHITECTURE
+================================================================================
+
+[AR-01] db passé en paramètre à chaque action de store — couplage fort
+------------------------------------------------------------------------
+Chaque action du store prend db en paramètre :
+  addTransaction(db, data), loadBudgets(db), updateSetting(db, key, value)
+
+Cela signifie que les screens connaissent l'existence de la DB.
+Le db devrait être capturé à l'initialisation du store, pas passé à chaque
+appel. Cela rend le testing des stores très difficile (mock de db requis).
+
+------------------------------------------------------------------------
+
+[AR-02] openDatabase() appelé 5 fois au niveau module — fragile
+------------------------------------------------------------------------
+Chaque fichier de screen :
+  const db = openDatabase(); // exécuté à l'import du module
+
+Bien que openDatabase soit un singleton, cette pattern expose des risques
+lors du hot-reload de Metro où les modules sont réimportés.
+
+------------------------------------------------------------------------
+
+[AR-03] Aucune couche de service pour la logique métier
+------------------------------------------------------------------------
+La logique "si le budget est dépassé, envoyer une notification" devrait
+être dans un service. Actuellement, chaque store et screen contient du
+code métier mélangé avec du code UI.
+
+Exemple : getBudgetProgress est dans le BudgetStore mais contient de la
+logique métier (calcul du mois courant, filtrage des transactions).
+
+------------------------------------------------------------------------
+
+[AR-04] Pas d'ErrorBoundary React
+------------------------------------------------------------------------
+Si un composant plante (ex: DonutChart avec data malformée), toute l'app
+crash avec un écran blanc. Aucun ErrorBoundary n'est défini.
+
+------------------------------------------------------------------------
+
+================================================================================
+5. PROBLÈMES DE PERFORMANCE
+================================================================================
+
+[PE-01] 15 requêtes SQL synchrones non mémoïsées dans le Dashboard
+(voir BC-04 pour les détails)
+
+[PE-02] Pas de pagination sur la liste des transactions
+(voir MF-06 pour les détails)
+
+[PE-03] DonutChart — Animated.createAnimatedComponent(Path) appelé dans renderSvgContent
+------------------------------------------------------------------------
+  const AnimatedPath = Animated.createAnimatedComponent(Path);
+Appelé dans le corps de renderSvgContent à chaque render. La création d'un
+composant animé doit être faite une seule fois en dehors du composant.
+
+------------------------------------------------------------------------
+
+[PE-04] BarChart — largeur SVG fixe à 300px
+------------------------------------------------------------------------
+const chartWidth = 300;
+Ne s'adapte pas à la taille de l'écran (petits téléphones < 360px,
+grandes tablettes > 768px). Sur les tablettes, le graphique laissera
+50% de l'espace vide.
+
+------------------------------------------------------------------------
+
+[PE-05] Tri et filtrage des transactions en mémoire JavaScript
+------------------------------------------------------------------------
+Le filtrage (filterType, search) et le tri (groupByDate) sont faits en JS
+sur le tableau transactions chargé entièrement. Avec de nombreuses données,
+déléguer le filtrage à SQLite (clauses WHERE en query) serait plus efficace.
+Les fonctions SQL existent dans queries.ts mais ne sont pas utilisées pour
+les filtres de l'écran transactions.
+
+------------------------------------------------------------------------
+
+================================================================================
+6. PROBLÈMES DE SÉCURITÉ
+================================================================================
+
+[SE-01] Absence d'authentification locale
+------------------------------------------------------------------------
+Aucun PIN, aucune biométrie. Les données financières de l'utilisateur sont
+accessibles sans aucune protection dès lors que le téléphone est déverrouillé.
+
+------------------------------------------------------------------------
+
+[SE-02] Export JSON en clair sans chiffrement
+------------------------------------------------------------------------
+Les transactions (montants, catégories, notes) sont exportées dans un fichier
+JSON non chiffré sur le stockage de l'appareil ou partagé. Pour une app
+financière, un chiffrement optionnel avec mot de passe serait recommandé.
+
+------------------------------------------------------------------------
+
+[SE-03] Note utilisateur sans sanitization
+------------------------------------------------------------------------
+La note est limitée à 200 chars dans l'UI mais pas en BD. Faible risque
+pour SQLite local, mais à corriger pour la cohérence et la défense en profondeur.
+La requête utilise des paramètres bindés (pas de string interpolation), donc
+pas de risque de SQL injection.
+
+------------------------------------------------------------------------
+
+================================================================================
+7. PROBLÈMES UX / DESIGN
+================================================================================
+
+[UX-01] DateTimePicker incohérent entre Android et iOS
+------------------------------------------------------------------------
+display="default" utilise le comportement natif de chaque plateforme :
+- Android : modal dialog
+- iOS : spinner inline dans la page
+L'expérience est radicalement différente. Utiliser display="spinner" ou
+une lib tierce comme react-native-modal-datetime-picker pour l'uniformité.
+
+------------------------------------------------------------------------
+
+[UX-02] NumPad sans bouton "Tout effacer" (AC)
+------------------------------------------------------------------------
+Seulement un backspace pour effacer caractère par caractère. Pour "350000",
+l'utilisateur doit appuyer 6 fois. Un bouton AC ou double-tap sur backspace
+améliorerait considérablement l'UX.
+
+------------------------------------------------------------------------
+
+[UX-03] Aucun feedback visuel après modification d'un budget
+------------------------------------------------------------------------
+Après handleSave() dans budgets.tsx, le modal se ferme sans toast, animation
+ou confirmation. L'utilisateur ne sait pas si la modification a réussi.
+
+------------------------------------------------------------------------
+
+[UX-04] Montants XAF avec décimales — DonutChart
+------------------------------------------------------------------------
+Le Franc CFA n'a pas de centimes. Afficher "78 500.00" est incorrect et
+non professionnel pour cette devise. Un formatter centralisé tenant compte
+de la devise éviterait ce problème.
+
+------------------------------------------------------------------------
+
+[UX-05] Absence de total journalier dans les sections de transactions
+------------------------------------------------------------------------
+Chaque section (Lundi 11 mai 2026) n'affiche pas le solde du jour.
+Toutes les apps fintech modernes (Lydia, N26, Revolut) affichent ce total.
+
+------------------------------------------------------------------------
+
+[UX-06] Liste des budgets triée par categoryId (ordre SQL)
+------------------------------------------------------------------------
+Les budgets sont triés par categoryId alphabétique en anglais (clothing,
+education, food...). L'utilisateur s'attendrait à un tri par montant restant
+(les plus critiques en premier) ou par nom français.
+
+------------------------------------------------------------------------
+
+[UX-07] Recherche dans les transactions — délai de frappe (debounce) absent
+------------------------------------------------------------------------
+Chaque frappe dans le champ de recherche déclenche immédiatement le filtre
+et re-render de toute la liste. Un debounce de 200-300ms améliorerait la
+réactivité perçue.
+
+------------------------------------------------------------------------
+
+[UX-08] BarChart — pas de labels sur l'axe Y avec des valeurs réelles
+------------------------------------------------------------------------
+L'axe Y affiche seulement "MAX" et "0". Des labels avec les vrais montants
+(ex: "350k", "700k") donneraient un contexte précieux.
+
+------------------------------------------------------------------------
+
+[UX-09] Message d'accueil "Bonjour 👋" avec emoji hardcodé
+------------------------------------------------------------------------
+Les emojis peuvent ne pas s'afficher correctement sur certains appareils
+Android anciens. Et le style de l'app est "minimaliste dark" — un emoji
+dans l'en-tête est incohérent avec l'esthétique.
+
+------------------------------------------------------------------------
+
+[UX-10] Aucun état de chargement (loading state) sur le Dashboard
+------------------------------------------------------------------------
+Lors du premier chargement, le dashboard affiche des zéros/vide pendant
+que les queries SQLite s'exécutent. Un ActivityIndicator ou un skeleton
+screen serait approprié.
+
+------------------------------------------------------------------------
+
+================================================================================
+8. DETTE TECHNIQUE
+================================================================================
+
+[DT-01] TypeScript — interface Budget.limit vs colonne limit_amount
+------------------------------------------------------------------------
+db/schema.ts:26 : `limit: number` (interface TypeScript)
+db/migrations.ts:28 : `limit_amount REAL NOT NULL`
+db/queries.ts:212 : `SELECT limit_amount as "limit"` (alias SQL pour mapper)
+
+Actuellement cela fonctionne grâce à l'alias SQL, mais c'est une incohérence
+de nommage qui prête à confusion. Soit renommer l'interface en limit_amount,
+soit garder l'alias et documenter l'intention.
+
+------------------------------------------------------------------------
+
+[DT-02] Commentaires résiduels de dev dans DonutChart — DonutChart.tsx:93-103
+------------------------------------------------------------------------
+Lignes 93 à 103 : un bloc de commentaires décrivant une approche abandonnée
+pour l'animation. Ces commentaires doivent être supprimés.
+
+------------------------------------------------------------------------
+
+[DT-03] Fonctions de catégories DB sans table correspondante — queries.ts:121-187
+------------------------------------------------------------------------
+addCategory, getCategories, updateCategory, deleteCategory font référence à
+une table 'categories' qui n't existe pas. Code mort ou prématuré qui
+devrait être supprimé ou complété.
+
+------------------------------------------------------------------------
+
+[DT-04] import 'react-native-get-random-values' dans queries.ts — db/queries.ts:2
+------------------------------------------------------------------------
+Cet import de polyfill est fait dans un module de données. Il devrait
+être importé une seule fois au point d'entrée de l'app (_layout.tsx),
+pas dans un module utilitaire.
+
+------------------------------------------------------------------------
+
+[DT-05] Aucun linter configuré (ESLint)
+------------------------------------------------------------------------
+Le projet ne semble pas avoir de configuration ESLint active. Sans linter,
+les erreurs de style, les imports inutilisés et les mauvaises pratiques
+passent inaperçues.
+
+------------------------------------------------------------------------
+
+================================================================================
+9. PLAN DE CORRECTION PRIORITAIRE
+================================================================================
+
+PRIORITÉ 1 — BLOQUANTS (corriger immédiatement)
+------------------------------------------------
+  1. [BC-01] Déplacer toastAnim dans useRef — add.tsx
+  2. [BC-02] Recharger les stores après handleReset — settings.tsx
+  3. [BC-03] Corriger le pull-to-refresh synchrone — index.tsx, transactions.tsx
+  4. [BC-04] Mémoïser les calculs DB du Dashboard dans useMemo
+  5. [BC-06] Corriger l'animation DonutChart (opacity vs strokeOpacity)
+  6. [BM-02] Ajouter un formatter de montant centralisé
+  7. [BM-07] Corriger setSetting pour utiliser INSERT OR REPLACE
+
+PRIORITÉ 2 — IMPORTANTS (sprint suivant)
+-----------------------------------------
+  1. [MF-01] Mettre en place Jest + testing-library (au moins les tests de queries.ts)
+  2. [MF-06] Pagination sur la liste des transactions (LIMIT/OFFSET)
+  3. [MF-04] Filtre par catégorie dans les transactions
+  4. [MF-02] Implémenter le theming dynamique (light/dark/auto)
+  5. [AR-04] Ajouter un ErrorBoundary global
+  6. [PE-05] Déléguer le filtrage à SQLite via getTransactions(db, filters)
+  7. [UX-05] Ajouter le total journalier dans les section headers
+
+PRIORITÉ 3 — AMÉLIORATIONS (backlog)
+--------------------------------------
+  1. [MF-13] Écran d'onboarding / configuration initiale
+  2. [MF-14] Code PIN / authentification biométrique
+  3. [MF-07] Sélecteur d'heure pour les rappels
+  4. [MF-08] UI pour les catégories personnalisées
+  5. [MF-09] Écran statistiques dédié
+  6. [UX-01] DateTimePicker uniforme (react-native-modal-datetime-picker)
+  7. [UX-02] Bouton "Tout effacer" dans NumPad
+  8. [UX-07] Debounce sur la recherche
+  9. [PE-04] BarChart responsive (Dimensions.get('window').width)
+  10. [SE-01] Authentification biométrique (expo-local-authentication)
+
+================================================================================
+RÉSUMÉ CHIFFRÉ
+================================================================================
+
+  Bugs critiques (bloquants)    :  7
+  Bugs mineurs                  :  8
+  Manques fonctionnels          : 15
+  Problèmes d'architecture      :  4
+  Problèmes de performance      :  5
+  Problèmes de sécurité         :  3
+  Problèmes UX/Design           : 10
+  Dette technique               :  5
+  ─────────────────────────────────
+  TOTAL                         : 57 points d'amélioration identifiés
+
+================================================================================
+FIN DU RAPPORT
+================================================================================

@@ -189,10 +189,15 @@ export const deleteCategory = (db: SQLite.SQLiteDatabase, id: string): void => {
 
 // --- Budgets ---
 export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>): Budget => {
-  const id = uuidv4();
   const { categoryId, limit, month } = budget;
+  const existing = getBudgetByCategoryId(db, categoryId);
+  if (existing) {
+    updateBudget(db, existing.id, limit);
+    return { ...existing, limit };
+  }
+  const id = uuidv4();
   db.runSync(
-    'INSERT OR REPLACE INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
+    'INSERT INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
     [id, categoryId, limit, month ?? null]
   );
   return { id, categoryId, limit, month };
@@ -228,7 +233,7 @@ export const getSetting = (db: SQLite.SQLiteDatabase, key: string): string | nul
 };
 
 export const setSetting = (db: SQLite.SQLiteDatabase, key: string, value: string): void => {
-  db.runSync('UPDATE settings SET value = ? WHERE key = ?', [value, key]);
+  db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
 };
 
 export const getAllSettings = (db: SQLite.SQLiteDatabase): Record<string, string> => {

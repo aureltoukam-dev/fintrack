@@ -44,8 +44,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function SettingsScreen() {
   const store = useSettingsStore();
-  const { transactions } = useTransactionStore();
-  const { budgets } = useBudgetStore();
+  const { transactions, loadTransactions } = useTransactionStore();
+  const { budgets, loadBudgets } = useBudgetStore();
   const [resetModal, setResetModal] = useState(false);
 
   useEffect(() => { store.loadSettings(db); }, []);
@@ -75,6 +75,8 @@ export default function SettingsScreen() {
   const handleReset = () => {
     db.runSync('DELETE FROM transactions');
     db.runSync('DELETE FROM budgets');
+    loadTransactions(db);
+    loadBudgets(db);
     Alert.alert('Réinitialisation', 'Toutes les données ont été supprimées.');
     setResetModal(false);
   };

@@ -33,12 +33,20 @@ export default function NumPad({ value, onValueChange, onConfirm, visible }: Pro
     }
   };
 
+  const handleClear = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onValueChange('');
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <View style={styles.pad}>
           <View style={styles.display}>
             <Text style={styles.displayText}>{value || '0'}</Text>
+            <TouchableOpacity onPress={handleClear} style={styles.clearBtn} accessibilityLabel="Tout effacer">
+              <Text style={styles.clearText}>AC</Text>
+            </TouchableOpacity>
           </View>
           {KEYS.map((row, ri) => (
             <View key={ri} style={styles.row}>
@@ -76,10 +84,13 @@ const styles = StyleSheet.create({
   display: {
     backgroundColor: C.surface2, borderRadius: RADIUS.md,
     padding: SPACING.lg, alignItems: 'center', marginBottom: SPACING.md,
+    flexDirection: 'row', justifyContent: 'center',
   },
   displayText: {
-    fontFamily: 'SpaceMono-Regular', fontSize: 32, color: C.text,
+    fontFamily: 'SpaceMono-Regular', fontSize: 32, color: C.text, flex: 1, textAlign: 'center',
   },
+  clearBtn: { padding: SPACING.xs },
+  clearText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.danger },
   row: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
   key: {
     flex: 1, height: 56, backgroundColor: C.surface2, borderRadius: RADIUS.md,

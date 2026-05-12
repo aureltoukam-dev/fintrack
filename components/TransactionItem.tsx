@@ -15,7 +15,8 @@ export default function TransactionItem({ transaction, category, currencySymbol,
   const amountColor = isIncome ? C.accent2 : C.danger;
   const amountPrefix = isIncome ? '+' : '−';
   const label = transaction.note || category.name;
-  const subLabel = `${category.name} · ${transaction.date}`;
+  const dateFormatted = new Date(transaction.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const subLabel = `${category.name} · ${dateFormatted}`;
 
   return (
     <TouchableOpacity

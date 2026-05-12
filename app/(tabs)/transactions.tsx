@@ -17,6 +17,7 @@ import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../consta
 import type { PeriodFilterType } from '../../db/schema';
 
 const db = openDatabase();
+const PAGE_SIZE = 50;
 
 type FilterType = 'all' | 'income' | 'expense';
 
@@ -51,6 +52,7 @@ export default function TransactionsScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { transactions, loadTransactions, deleteTransaction } = useTransactionStore();
@@ -95,7 +97,9 @@ export default function TransactionsScreen() {
     return result;
   }, [transactions, filterPeriod, filterType, filterCategory, debouncedSearch, startDate, endDate]);
 
-  const sections = useMemo(() => groupByDate(filtered), [filtered]);
+  const paginatedFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const sections = useMemo(() => groupByDate(paginatedFiltered), [paginatedFiltered]);
+  const hasMore = filtered.length > visibleCount;
   const currencySymbol = getCurrencySymbol();
 
   const totalFiltered = useMemo(() => {
@@ -103,6 +107,8 @@ export default function TransactionsScreen() {
     const expense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     return { income, expense, net: income - expense };
   }, [filtered]);
+
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filterPeriod, filterType, filterCategory, debouncedSearch]);
 
   const categoryOptions = useMemo(() => {
     if (filterType === 'income') return INCOME_CATEGORIES;
@@ -200,6 +206,16 @@ export default function TransactionsScreen() {
         sections={sections}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+        onEndReached={() => { if (hasMore) setVisibleCount(c => c + PAGE_SIZE); }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={hasMore ? (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={() => setVisibleCount(c => c + PAGE_SIZE)}
+          >
+            <Text style={styles.loadMoreText}>Charger plus ({filtered.length - visibleCount} restantes)</Text>
+          </TouchableOpacity>
+        ) : null}
         renderSectionHeader={({ section }) => {
           const dayIncome = section.data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
           const dayExpense = section.data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -338,4 +354,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md, borderTopWidth: 1, borderTopColor: C.surface2,
   },
   sheetBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md },
+  loadMoreBtn: {
+    alignItems: 'center', padding: SPACING.lg, marginBottom: 80,
+  },
+  loadMoreText: {
+    fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.accent,
+  },
 });

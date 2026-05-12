@@ -25,18 +25,25 @@ apply plugin: "com.facebook.react.rootproject"
 
 // Force JVM target consistency: Java 17 + Kotlin 17 across all subprojects
 subprojects {
-    afterEvaluate {
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-            kotlinOptions {
-                jvmTarget = "17"
+    project.configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-')) {
+                details.useVersion '1.9.10'
             }
         }
-        if (it.hasProperty('android')) {
-            android {
+    }
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17
                     targetCompatibility JavaVersion.VERSION_17
                 }
+            }
+        }
+        project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
             }
         }
     }

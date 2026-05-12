@@ -38,3 +38,4 @@ export interface Settings {
   reminderTime?: string; // HH:MM
 }
 export type PeriodType = 'week' | 'month' | 'quarter' | 'year' | 'custom';
+export type PeriodFilterType = PeriodType | 'all';

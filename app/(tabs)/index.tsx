@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { openDatabase } from '../../db/migrations';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useSettingsStore } from '../../stores/settingsStore';

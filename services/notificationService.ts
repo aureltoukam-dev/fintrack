@@ -40,7 +40,8 @@ export const checkAndAlertBudgets = async (
 
   const [year, month] = monthKey.split('-');
   const startDate = `${year}-${month}-01`;
-  const endDate = `${year}-${month}-31`;
+  const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+  const endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
   const stats = getCategoryStats(db, startDate, endDate, 'expense');
 
   for (const budget of budgets) {

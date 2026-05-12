@@ -1,5 +1,6 @@
 import 'react-native-get-random-values';
 import { useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -12,7 +13,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useCategoryStore } from '../stores/categoryStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useAuthStore } from '../stores/authStore';
 import { ThemeContext, useThemeColors } from '../constants/theme';
+import LockScreen from '../components/LockScreen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,7 +24,9 @@ export default function RootLayout() {
   const { theme, loadSettings: _ls } = useSettingsStore();
   const colors = useThemeColors(theme);
   const router = useRouter();
+  const { isLocked, isAuthReady, initAuth, lock } = useAuthStore();
   const onboardingChecked = useRef(false);
+  const appState = useRef<AppStateStatus>(AppState.currentState);
   const [fontsLoaded] = useFonts({
     'Sora-Regular': Sora_400Regular,
     'Sora-SemiBold': Sora_600SemiBold,
@@ -44,7 +49,19 @@ export default function RootLayout() {
     } catch (e) {
       console.error('DB init error:', e);
     }
+    initAuth();
   }, []);
+
+  // Lock on background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appState.current === 'active' && next === 'background') {
+        lock();
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, [lock]);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -52,7 +69,18 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !isAuthReady) return null;
+
+  if (isLocked) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeContext.Provider value={colors}>
+          <StatusBar style={theme === 'light' ? 'dark' : 'light'} backgroundColor={colors.bg} />
+          <LockScreen />
+        </ThemeContext.Provider>
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

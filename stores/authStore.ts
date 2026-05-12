@@ -52,8 +52,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   lock: () => {
-    const { isPinEnabled, isBiometricEnabled } = get();
-    if (isPinEnabled || isBiometricEnabled) {
+    // Only lock when PIN is set — biometric requires PIN as fallback
+    if (get().isPinEnabled) {
       set({ isLocked: true });
     }
   },

@@ -13,8 +13,8 @@ interface BudgetStore {
   isLoaded: boolean;
   loadBudgets: (db: SQLite.SQLiteDatabase, monthKey?: string | null) => void;
   addBudget: (db: SQLite.SQLiteDatabase, data: Omit<Budget, 'id'>) => Budget;
-  updateBudget: (db: SQLite.SQLiteDatabase, id: string, limit: number) => void;
-  deleteBudget: (db: SQLite.SQLiteDatabase, id: string) => void;
+  updateBudget: (db: SQLite.SQLiteDatabase, id: string, limit: number, monthKey?: string | null) => void;
+  deleteBudget: (db: SQLite.SQLiteDatabase, id: string, monthKey?: string | null) => void;
 }
 
 export const useBudgetStore = create<BudgetStore>((set, get) => ({
@@ -32,13 +32,13 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
     return budget;
   },
 
-  updateBudget: (db, id, limit) => {
+  updateBudget: (db, id, limit, monthKey) => {
     updateBudget(db, id, limit);
-    get().loadBudgets(db);
+    get().loadBudgets(db, monthKey);
   },
 
-  deleteBudget: (db, id) => {
+  deleteBudget: (db, id, monthKey) => {
     deleteBudget(db, id);
-    get().loadBudgets(db);
+    get().loadBudgets(db, monthKey);
   },
 }));

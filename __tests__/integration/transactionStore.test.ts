@@ -3,6 +3,7 @@ jest.mock('../../db/queries', () => ({
   updateTransaction: jest.fn(),
   deleteTransaction: jest.fn(),
   getTransactions: jest.fn(() => []),
+  getTransactionById: jest.fn(() => null),
   getPeriodStats: jest.fn(() => ({ income: 0, expense: 0 })),
   getCategoryStats: jest.fn(() => []),
 }));
@@ -32,9 +33,10 @@ const mockDb = {} as any;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (require('../../db/queries').getTransactions as jest.Mock).mockReturnValue([]);
+  const q = require('../../db/queries');
+  (q.getTransactions as jest.Mock).mockReturnValue([]);
+  (q.getTransactionById as jest.Mock).mockReturnValue(null);
   (useSettingsStore.getState as jest.Mock).mockReturnValue({ notifyBudget: true, budgetAlertThreshold: 80 });
-  // Reset store state
   useTransactionStore.setState({ transactions: [], isLoaded: false });
 });
 
@@ -121,14 +123,38 @@ describe('transactionStore.updateTransaction', () => {
     expect(mockCheckAlerts).toHaveBeenCalledWith(mockDb, '2026-05', 80, []);
   });
 
-  test('does NOT trigger check when type is omitted from update data (known bug)', async () => {
-    // Only updating amount — data.type is undefined.
-    // The original transaction is presumably an expense, but the check is skipped.
+  test('triggers check for amount-only update by looking up DB row (fix: bug 2)', async () => {
+    const { getTransactionById: gtb } = require('../../db/queries');
+    (gtb as jest.Mock).mockReturnValue({
+      id: 'tx1', date: '2026-05-12', amount: 90, type: 'expense', categoryId: 'food', createdAt: '',
+    });
+
     useTransactionStore.getState().updateTransaction(mockDb, 'tx1', { amount: 90 });
 
     await new Promise(r => setTimeout(r, 10));
+    expect(mockCheckAlerts).toHaveBeenCalledWith(mockDb, '2026-05', 80, []);
+  });
+
+  test('no check when existing row is income (amount-only update)', async () => {
+    const { getTransactionById: gtb } = require('../../db/queries');
+    (gtb as jest.Mock).mockReturnValue({
+      id: 'tx1', date: '2026-05-12', amount: 200, type: 'income', categoryId: 'salary', createdAt: '',
+    });
+
+    useTransactionStore.getState().updateTransaction(mockDb, 'tx1', { amount: 200 });
+
+    await new Promise(r => setTimeout(r, 10));
     expect(mockCheckAlerts).not.toHaveBeenCalled();
-    // BUG: amount-only updates bypass budget check even for expense transactions
+  });
+
+  test('no check when transaction no longer exists in DB', async () => {
+    const { getTransactionById: gtb } = require('../../db/queries');
+    (gtb as jest.Mock).mockReturnValue(null);
+
+    useTransactionStore.getState().updateTransaction(mockDb, 'ghost', { amount: 90 });
+
+    await new Promise(r => setTimeout(r, 10));
+    expect(mockCheckAlerts).not.toHaveBeenCalled();
   });
 
   test('does NOT trigger check for income updates', async () => {

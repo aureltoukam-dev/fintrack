@@ -114,7 +114,7 @@ export default function BudgetsScreen() {
     const limit = parseFloat(amount);
     if (!limit || limit <= 0) { Alert.alert('Erreur', 'Montant invalide'); return; }
     if (editId) {
-      updateBudget(db, editId, limit);
+      updateBudget(db, editId, limit, monthKey);
     } else {
       addBudget(db, {
         categoryId: selectedCat,
@@ -259,7 +259,7 @@ export default function BudgetsScreen() {
                 style={[styles.saveBtn, { backgroundColor: C.danger, marginTop: SPACING.sm }]}
                 onPress={() => Alert.alert('Supprimer', 'Supprimer ce budget ?', [
                   { text: 'Annuler', style: 'cancel' },
-                  { text: 'Supprimer', style: 'destructive', onPress: () => { deleteBudget(db, editId!); setAddModal(false); } },
+                  { text: 'Supprimer', style: 'destructive', onPress: () => { deleteBudget(db, editId!, monthKey); setAddModal(false); } },
                 ])}
               >
                 <Text style={styles.saveBtnText}>Supprimer le budget</Text>

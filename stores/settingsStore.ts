@@ -43,7 +43,7 @@ function parseSettings(raw: Record<string, string>): Partial<SettingsState> {
     theme: (raw.theme as SettingsState['theme']) ?? defaults.theme,
     dateFormat: raw.dateFormat ?? defaults.dateFormat,
     notifyBudget: raw.notifyBudget !== 'false',
-    budgetAlertThreshold: raw.budgetAlertThreshold ? parseInt(raw.budgetAlertThreshold, 10) : defaults.budgetAlertThreshold,
+    budgetAlertThreshold: (() => { const v = parseInt(raw.budgetAlertThreshold, 10); return Number.isNaN(v) ? defaults.budgetAlertThreshold : v; })(),
     notifyReminder: raw.notifyReminder === 'true',
     reminderTime: raw.reminderTime ?? defaults.reminderTime,
     isLoaded: true,

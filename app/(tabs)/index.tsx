@@ -22,7 +22,7 @@ const db = openDatabase();
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const [period, setPeriod] = useState<PeriodType>('month');
+  const [period, setPeriod] = useState<Exclude<PeriodType, 'custom'>>('month');
   const [refreshing, setRefreshing] = useState(false);
 
   const { transactions, loadTransactions, getPeriodStats, getCategoryStats } = useTransactionStore();
@@ -53,8 +53,7 @@ export default function DashboardScreen() {
   );
 
   const barData = useMemo(() => {
-    const safePeriod = period === 'custom' ? 'year' : period;
-    const slices = getBarSlicesForPeriod(safePeriod);
+    const slices = getBarSlicesForPeriod(period);
     return slices.map(slice => {
       const s = getPeriodStats(db, slice.start, slice.end);
       return { label: slice.label, income: s.income, expense: s.expense };
@@ -94,7 +93,7 @@ export default function DashboardScreen() {
       </View>
 
       {/* Period Selector */}
-      <PeriodSelector selected={period} onSelect={setPeriod} />
+      <PeriodSelector selected={period} onSelect={(p) => { if (p !== 'all') setPeriod(p as Exclude<PeriodType, 'custom'>); }} />
 
       {/* Balance Card */}
       <View style={styles.section}>

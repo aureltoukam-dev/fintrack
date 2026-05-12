@@ -189,10 +189,15 @@ export const deleteCategory = (db: SQLite.SQLiteDatabase, id: string): void => {
 
 // --- Budgets ---
 export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>): Budget => {
-  const id = uuidv4();
   const { categoryId, limit, month } = budget;
+  const existing = getBudgetByCategoryId(db, categoryId);
+  if (existing) {
+    updateBudget(db, existing.id, limit);
+    return { ...existing, limit };
+  }
+  const id = uuidv4();
   db.runSync(
-    'INSERT OR REPLACE INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
+    'INSERT INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
     [id, categoryId, limit, month ?? null]
   );
   return { id, categoryId, limit, month };
@@ -228,7 +233,7 @@ export const getSetting = (db: SQLite.SQLiteDatabase, key: string): string | nul
 };
 
 export const setSetting = (db: SQLite.SQLiteDatabase, key: string, value: string): void => {
-  db.runSync('UPDATE settings SET value = ? WHERE key = ?', [value, key]);
+  db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
 };
 
 export const getAllSettings = (db: SQLite.SQLiteDatabase): Record<string, string> => {
@@ -238,6 +243,53 @@ export const getAllSettings = (db: SQLite.SQLiteDatabase): Record<string, string
     settings[row.key] = row.value;
   });
   return settings;
+};
+
+// --- Custom Categories ---
+export interface CustomCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  type: 'income' | 'expense' | 'both';
+  isActive: number;
+}
+
+export const getCustomCategories = (db: SQLite.SQLiteDatabase): CustomCategory[] => {
+  return db.getAllSync('SELECT * FROM custom_categories WHERE isActive = 1 ORDER BY name ASC') as CustomCategory[];
+};
+
+export const addCustomCategory = (
+  db: SQLite.SQLiteDatabase,
+  data: Omit<CustomCategory, 'id' | 'isActive'>
+): CustomCategory => {
+  const id = uuidv4();
+  db.runSync(
+    'INSERT INTO custom_categories (id, name, icon, color, type, isActive) VALUES (?, ?, ?, ?, ?, 1)',
+    [id, data.name, data.icon, data.color, data.type]
+  );
+  return { ...data, id, isActive: 1 };
+};
+
+export const updateCustomCategory = (
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  data: Partial<Omit<CustomCategory, 'id'>>
+): void => {
+  const fields: string[] = [];
+  const params: any[] = [];
+  if (data.name !== undefined) { fields.push('name = ?'); params.push(data.name); }
+  if (data.icon !== undefined) { fields.push('icon = ?'); params.push(data.icon); }
+  if (data.color !== undefined) { fields.push('color = ?'); params.push(data.color); }
+  if (data.type !== undefined) { fields.push('type = ?'); params.push(data.type); }
+  if (data.isActive !== undefined) { fields.push('isActive = ?'); params.push(data.isActive); }
+  if (fields.length === 0) return;
+  params.push(id);
+  db.runSync(`UPDATE custom_categories SET ${fields.join(', ')} WHERE id = ?`, params);
+};
+
+export const deleteCustomCategory = (db: SQLite.SQLiteDatabase, id: string): void => {
+  db.runSync('UPDATE custom_categories SET isActive = 0 WHERE id = ?', [id]);
 };
 
 // --- Stats ---

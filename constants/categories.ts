@@ -16,11 +16,17 @@ export const CATEGORIES: Category[] = [
   { id: 'other', name: 'Autre', icon: '📌', color: '#9896B0', type: 'both', isCustom: false, isActive: true },
 ];
 
+let _runtimeCategories: Category[] = CATEGORIES;
+
+export const setRuntimeCategories = (cats: Category[]) => {
+  _runtimeCategories = cats;
+};
+
 export const getCategoryById = (id: string): Category | undefined =>
-  CATEGORIES.find(c => c.id === id);
+  _runtimeCategories.find(c => c.id === id);
 
 export const getCategoriesByType = (type: 'income' | 'expense'): Category[] =>
-  CATEGORIES.filter(c => c.type === type || c.type === 'both').filter(c => c.isActive);
+  _runtimeCategories.filter(c => (c.type === type || c.type === 'both') && c.isActive);
 
-export const EXPENSE_CATEGORIES = getCategoriesByType('expense');
-export const INCOME_CATEGORIES = getCategoriesByType('income');
+export const EXPENSE_CATEGORIES = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both');
+export const INCOME_CATEGORIES = CATEGORIES.filter(c => c.type === 'income' || c.type === 'both');

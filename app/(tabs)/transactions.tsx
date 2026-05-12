@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity,
   TextInput, ScrollView, Modal, Alert, RefreshControl,
@@ -10,8 +10,11 @@ import { useTransactionStore } from '../../stores/transactionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { CATEGORIES, getCategoryById } from '../../constants/categories';
 import TransactionItem from '../../components/TransactionItem';
+import PeriodSelector from '../../components/PeriodSelector';
 import { Transaction } from '../../db/schema';
+import { getPeriodDates } from '../../services/periodFilter';
 import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
+import type { PeriodFilterType } from '../../db/schema';
 
 const db = openDatabase();
 
@@ -36,12 +39,19 @@ function groupByDate(transactions: Transaction[]): { title: string; data: Transa
     });
 }
 
+const EXPENSE_CATEGORIES = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both');
+const INCOME_CATEGORIES = CATEGORIES.filter(c => c.type === 'income' || c.type === 'both');
+
 export default function TransactionsScreen() {
   const router = useRouter();
   const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterPeriod, setFilterPeriod] = useState<PeriodFilterType>('month');
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { transactions, loadTransactions, deleteTransaction } = useTransactionStore();
   const { getCurrencySymbol, loadSettings } = useSettingsStore();
@@ -54,24 +64,51 @@ export default function TransactionsScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadTransactions(db);
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 0);
   }, []);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearch(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedSearch(text), 250);
+  }, []);
+
+  const { startDate, endDate } = useMemo(() => {
+    if (filterPeriod === 'all') return { startDate: null, endDate: null };
+    return getPeriodDates(filterPeriod as any);
+  }, [filterPeriod]);
 
   const filtered = useMemo(() => {
     let result = [...transactions];
+    if (filterPeriod !== 'all' && startDate && endDate) {
+      result = result.filter(t => t.date >= startDate && t.date <= endDate);
+    }
     if (filterType !== 'all') result = result.filter(t => t.type === filterType);
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (filterCategory) result = result.filter(t => t.categoryId === filterCategory);
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       result = result.filter(t => {
         const cat = getCategoryById(t.categoryId);
         return (t.note?.toLowerCase().includes(q) || cat?.name.toLowerCase().includes(q));
       });
     }
     return result;
-  }, [transactions, filterType, search]);
+  }, [transactions, filterPeriod, filterType, filterCategory, debouncedSearch, startDate, endDate]);
 
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
   const currencySymbol = getCurrencySymbol();
+
+  const totalFiltered = useMemo(() => {
+    const income = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    return { income, expense, net: income - expense };
+  }, [filtered]);
+
+  const categoryOptions = useMemo(() => {
+    if (filterType === 'income') return INCOME_CATEGORIES;
+    if (filterType === 'expense') return EXPENSE_CATEGORIES;
+    return CATEGORIES.filter(c => c.isActive);
+  }, [filterType]);
 
   const handleDelete = () => {
     if (!selectedTx) return;
@@ -97,21 +134,28 @@ export default function TransactionsScreen() {
           placeholder="Rechercher..."
           placeholderTextColor={C.text3}
           value={search}
-          onChangeText={setSearch}
+          onChangeText={handleSearchChange}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
+          <TouchableOpacity onPress={() => { setSearch(''); setDebouncedSearch(''); }}>
             <Feather name="x" size={16} color={C.text3} />
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Period filter */}
+      <PeriodSelector
+        selected={filterPeriod}
+        onSelect={(p) => { setFilterPeriod(p); setFilterCategory(null); }}
+        showAll
+      />
 
       {/* Type filters */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters}>
         {(['all', 'expense', 'income'] as FilterType[]).map(f => (
           <TouchableOpacity
             key={f}
-            onPress={() => setFilterType(f)}
+            onPress={() => { setFilterType(f); setFilterCategory(null); }}
             style={[styles.chip, filterType === f && styles.chipActive]}
           >
             <Text style={[styles.chipText, filterType === f && styles.chipTextActive]}>
@@ -119,18 +163,56 @@ export default function TransactionsScreen() {
             </Text>
           </TouchableOpacity>
         ))}
+        <View style={styles.chipSeparator} />
+        {categoryOptions.map(cat => (
+          <TouchableOpacity
+            key={cat.id}
+            onPress={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+            style={[styles.chip, filterCategory === cat.id && { backgroundColor: cat.color + '55' }]}
+          >
+            <Text style={styles.chipIcon}>{cat.icon}</Text>
+            <Text style={[styles.chipText, filterCategory === cat.id && { color: cat.color }]}>
+              {cat.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
+
+      {/* Summary bar */}
+      <View style={styles.summaryBar}>
+        <Text style={styles.summaryCount}>{filtered.length} opération{filtered.length !== 1 ? 's' : ''}</Text>
+        <View style={styles.summaryAmounts}>
+          {totalFiltered.income > 0 && (
+            <Text style={[styles.summaryAmount, { color: C.accent2 }]}>
+              +{totalFiltered.income.toLocaleString('fr-FR')} {currencySymbol}
+            </Text>
+          )}
+          {totalFiltered.expense > 0 && (
+            <Text style={[styles.summaryAmount, { color: C.danger }]}>
+              -{totalFiltered.expense.toLocaleString('fr-FR')} {currencySymbol}
+            </Text>
+          )}
+        </View>
+      </View>
 
       {/* List */}
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-          </View>
-        )}
+        renderSectionHeader={({ section }) => {
+          const dayIncome = section.data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+          const dayExpense = section.data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+          const dayNet = dayIncome - dayExpense;
+          return (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={[styles.sectionNet, { color: dayNet >= 0 ? C.accent2 : C.danger }]}>
+                {dayNet >= 0 ? '+' : ''}{dayNet.toLocaleString('fr-FR')} {currencySymbol}
+              </Text>
+            </View>
+          );
+        }}
         renderItem={({ item }) => {
           const cat = getCategoryById(item.categoryId);
           return cat ? (
@@ -171,7 +253,11 @@ export default function TransactionsScreen() {
               <Text style={styles.sheetAmount}>
                 {selectedTx.type === 'expense' ? '−' : '+'}{currencySymbol} {selectedTx.amount.toLocaleString('fr-FR')}
               </Text>
-              <Text style={styles.sheetDate}>{selectedTx.date}</Text>
+              <Text style={styles.sheetDate}>
+                {new Date(selectedTx.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </Text>
               <TouchableOpacity
                 style={styles.sheetBtn}
                 onPress={() => {
@@ -198,24 +284,36 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
-    margin: SPACING.lg, paddingHorizontal: SPACING.md,
+    margin: SPACING.lg, marginBottom: SPACING.sm, paddingHorizontal: SPACING.md,
     backgroundColor: C.surface2, borderRadius: RADIUS.md, height: 44,
   },
   searchInput: {
     flex: 1, fontFamily: T.fonts.body, fontSize: T.sizes.md,
     color: C.text, height: 44,
   },
-  filters: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
+  filters: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xs },
   chip: {
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full, backgroundColor: C.surface2, marginRight: SPACING.sm, height: 32,
-    alignItems: 'center', justifyContent: 'center',
+    borderRadius: RADIUS.full, backgroundColor: C.surface2, marginRight: SPACING.xs, height: 32,
+    alignSelf: 'flex-start',
   },
   chipActive: { backgroundColor: C.accent },
   chipText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
   chipTextActive: { color: '#FFF' },
-  sectionHeader: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, backgroundColor: C.bg },
+  chipIcon: { fontSize: 12, marginRight: 3 },
+  chipSeparator: { width: 1, backgroundColor: C.surface3, marginHorizontal: SPACING.xs, height: 20, alignSelf: 'center' },
+  summaryBar: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs,
+    borderBottomWidth: 1, borderBottomColor: C.surface2,
+  },
+  summaryCount: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
+  summaryAmounts: { flexDirection: 'row', gap: SPACING.sm },
+  summaryAmount: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, backgroundColor: C.bg },
   sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
+  sectionNet: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
   empty: { textAlign: 'center', color: C.text2, fontFamily: T.fonts.body, padding: SPACING.xl },
   fab: {
     position: 'absolute', bottom: 24, right: 24,

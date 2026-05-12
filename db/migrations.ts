@@ -34,6 +34,15 @@ export const runMigrations = (database: SQLite.SQLiteDatabase) => {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS custom_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT '📌',
+      color TEXT NOT NULL DEFAULT '#9896B0',
+      type TEXT NOT NULL CHECK(type IN ('income', 'expense', 'both')),
+      isActive INTEGER NOT NULL DEFAULT 1
+    );
   `);
 
   // Create indexes

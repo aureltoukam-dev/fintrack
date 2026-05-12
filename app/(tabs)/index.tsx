@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity,
   RefreshControl, ActivityIndicator,
@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { openDatabase } from '../../db/migrations';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { getPeriodDates, getLast6Months } from '../../services/periodFilter';
+import { getPeriodDates, getBarSlicesForPeriod } from '../../services/periodFilter';
 import { CATEGORIES } from '../../constants/categories';
 import BalanceCard from '../../components/BalanceCard';
 import PeriodSelector from '../../components/PeriodSelector';
@@ -33,26 +33,35 @@ export default function DashboardScreen() {
     loadTransactions(db);
   }, []);
 
-  const onRefresh = useCallback(async () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadTransactions(db);
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 0);
   }, []);
 
   const { startDate, endDate, label: periodLabel } = getPeriodDates(period);
-  const stats = getPeriodStats(db, startDate, endDate);
-  const categoryStats = getCategoryStats(db, startDate, endDate);
   const currencySymbol = getCurrencySymbol();
 
-  const last6 = getLast6Months();
-  const barData = last6.map(({ monthNum, year, label }) => {
-    const start = `${year}-${monthNum}-01`;
-    const end = `${year}-${monthNum}-31`;
-    const s = getPeriodStats(db, start, end);
-    return { month: label, income: s.income, expense: s.expense };
-  });
+  const stats = useMemo(
+    () => getPeriodStats(db, startDate, endDate),
+    [startDate, endDate, transactions]
+  );
 
-  const donutData = categoryStats.slice(0, 5).map(cs => {
+  const categoryStats = useMemo(
+    () => getCategoryStats(db, startDate, endDate),
+    [startDate, endDate, transactions]
+  );
+
+  const barData = useMemo(() => {
+    const safePeriod = period === 'custom' ? 'year' : period;
+    const slices = getBarSlicesForPeriod(safePeriod);
+    return slices.map(slice => {
+      const s = getPeriodStats(db, slice.start, slice.end);
+      return { label: slice.label, income: s.income, expense: s.expense };
+    });
+  }, [period, transactions]);
+
+  const donutData = useMemo(() => categoryStats.slice(0, 5).map(cs => {
     const cat = CATEGORIES.find(c => c.id === cs.categoryId);
     return {
       categoryId: cs.categoryId,
@@ -61,10 +70,14 @@ export default function DashboardScreen() {
       amount: cs.total,
       color: cat?.color ?? '#9896B0',
     };
-  });
-  const donutTotal = categoryStats.reduce((s, cs) => s + cs.total, 0);
+  }), [categoryStats]);
 
-  const recentTransactions = [...transactions].slice(0, 5);
+  const donutTotal = useMemo(
+    () => categoryStats.reduce((s, cs) => s + cs.total, 0),
+    [categoryStats]
+  );
+
+  const recentTransactions = useMemo(() => [...transactions].slice(0, 5), [transactions]);
 
   return (
     <ScrollView
@@ -96,7 +109,12 @@ export default function DashboardScreen() {
 
       {/* Bar Chart */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Flux des 6 derniers mois</Text>
+        <Text style={styles.sectionTitle}>
+          {period === 'week' ? 'Flux de la semaine (par jour)' :
+           period === 'month' ? 'Flux du mois (par semaine)' :
+           period === 'quarter' ? 'Flux du trimestre (par mois)' :
+           'Flux de l\'année (par mois)'}
+        </Text>
         <BarChart data={barData} />
       </View>
 

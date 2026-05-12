@@ -4,6 +4,7 @@ import {
   Switch, TextInput, Modal, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { openDatabase } from '../../db/migrations';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTransactionStore } from '../../stores/transactionStore';
@@ -43,9 +44,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const store = useSettingsStore();
-  const { transactions } = useTransactionStore();
-  const { budgets } = useBudgetStore();
+  const { transactions, loadTransactions } = useTransactionStore();
+  const { budgets, loadBudgets } = useBudgetStore();
   const [resetModal, setResetModal] = useState(false);
 
   useEffect(() => { store.loadSettings(db); }, []);
@@ -75,6 +77,8 @@ export default function SettingsScreen() {
   const handleReset = () => {
     db.runSync('DELETE FROM transactions');
     db.runSync('DELETE FROM budgets');
+    loadTransactions(db);
+    loadBudgets(db);
     Alert.alert('Réinitialisation', 'Toutes les données ont été supprimées.');
     setResetModal(false);
   };
@@ -163,6 +167,15 @@ export default function SettingsScreen() {
             thumbColor="#FFF"
           />
         </Row>
+      </Section>
+
+      {/* Catégories */}
+      <Section title="Catégories">
+        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/categories')}>
+          <Feather name="tag" size={18} color={C.accent} />
+          <Text style={[styles.actionText, { color: C.accent }]}>Gérer les catégories</Text>
+          <Feather name="chevron-right" size={16} color={C.text3} style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
       </Section>
 
       {/* Données */}

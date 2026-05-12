@@ -117,6 +117,57 @@ export const getLast6Months = (): { monthNum: string; year: number; label: strin
   return result;
 };
 
+export type BarSlice = { label: string; start: string; end: string };
+
+export const getBarSlicesForPeriod = (period: 'week' | 'month' | 'quarter' | 'year'): BarSlice[] => {
+  const today = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (period === 'week') {
+    const start = getStartOfWeek(today);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const dayLabels = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+      return { label: dayLabels[i], start: iso(d), end: iso(d) };
+    });
+  }
+
+  if (period === 'month') {
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const slices: BarSlice[] = [];
+    for (let w = 0; w < 5; w++) {
+      const dayStart = w * 7 + 1;
+      if (dayStart > daysInMonth) break;
+      const dayEnd = Math.min(dayStart + 6, daysInMonth);
+      const s = new Date(year, month, dayStart);
+      const e = new Date(year, month, dayEnd);
+      slices.push({ label: `S${w + 1}`, start: iso(s), end: iso(e) });
+    }
+    return slices;
+  }
+
+  if (period === 'quarter') {
+    const quarterStart = getStartOfQuarter(today);
+    const startMonth = quarterStart.getMonth();
+    return [0, 1, 2].map(i => {
+      const s = new Date(quarterStart.getFullYear(), startMonth + i, 1);
+      const e = new Date(quarterStart.getFullYear(), startMonth + i + 1, 0);
+      return { label: MONTH_LABELS[s.getMonth()], start: iso(s), end: iso(e) };
+    });
+  }
+
+  // year: 12 months
+  return Array.from({ length: 12 }, (_, i) => {
+    const s = new Date(today.getFullYear(), i, 1);
+    const e = new Date(today.getFullYear(), i + 1, 0);
+    return { label: MONTH_LABELS[i], start: iso(s), end: iso(e) };
+  });
+};
+
 export const formatDate = (dateString: string, format: string): string => {
   const date = new Date(dateString);
   const year = date.getFullYear();

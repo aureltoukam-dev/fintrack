@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, Alert,
+  Modal, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { openDatabase } from '../../db/migrations';
@@ -11,12 +11,15 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { CATEGORIES, getCategoryById } from '../../constants/categories';
 import BudgetProgressBar from '../../components/BudgetProgressBar';
 import NumPad from '../../components/NumPad';
+import PeriodSelector from '../../components/PeriodSelector';
 import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
+import { getPeriodDates } from '../../services/periodFilter';
+import type { PeriodFilterType } from '../../db/schema';
 
 const db = openDatabase();
 
 export default function BudgetsScreen() {
-  const { budgets, loadBudgets, addBudget, updateBudget, deleteBudget, getBudgetProgress } = useBudgetStore();
+  const { budgets, loadBudgets, addBudget, updateBudget, deleteBudget } = useBudgetStore();
   const { transactions, loadTransactions } = useTransactionStore();
   const { getCurrencySymbol, loadSettings } = useSettingsStore();
 
@@ -25,6 +28,7 @@ export default function BudgetsScreen() {
   const [selectedCat, setSelectedCat] = useState('food');
   const [amount, setAmount] = useState('');
   const [numPadVisible, setNumPadVisible] = useState(false);
+  const [period, setPeriod] = useState<PeriodFilterType>('month');
 
   useEffect(() => {
     loadSettings(db);
@@ -35,11 +39,22 @@ export default function BudgetsScreen() {
   const currencySymbol = getCurrencySymbol();
   const expenseCategories = CATEGORIES.filter(c => c.type === 'expense' || c.type === 'both');
 
+  const { startDate, endDate } = useMemo(() => {
+    if (period === 'all') {
+      return { startDate: '2000-01-01', endDate: '2099-12-31' };
+    }
+    return getPeriodDates(period as any);
+  }, [period]);
+
+  const getSpentForPeriod = (categoryId: string) => {
+    return transactions
+      .filter(t => t.categoryId === categoryId && t.type === 'expense'
+        && t.date >= startDate && t.date <= endDate)
+      .reduce((s, t) => s + t.amount, 0);
+  };
+
   const totalBudget = budgets.reduce((s, b) => s + b.limit, 0);
-  const totalSpent = budgets.reduce((s, b) => {
-    const progress = getBudgetProgress(b.categoryId, transactions);
-    return s + progress.spent;
-  }, 0);
+  const totalSpent = budgets.reduce((s, b) => s + getSpentForPeriod(b.categoryId), 0);
   const globalPercent = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
   const handleSave = () => {
@@ -53,10 +68,12 @@ export default function BudgetsScreen() {
     setAddModal(false);
     setAmount('');
     setEditId(null);
+    Alert.alert('', editId ? 'Budget modifié ✓' : 'Budget créé ✓', [{ text: 'OK' }]);
   };
 
   return (
     <View style={styles.container}>
+      <PeriodSelector selected={period} onSelect={setPeriod} showAll />
       <ScrollView contentContainerStyle={styles.content}>
         {/* Summary Card */}
         <View style={styles.summaryCard}>
@@ -88,12 +105,12 @@ export default function BudgetsScreen() {
           </View>
         ) : (
           budgets.map(budget => {
-            const progress = getBudgetProgress(budget.categoryId, transactions);
+            const spent = getSpentForPeriod(budget.categoryId);
             const cat = getCategoryById(budget.categoryId);
             return (
               <View key={budget.id} style={styles.budgetItem}>
                 <BudgetProgressBar
-                  spent={progress.spent}
+                  spent={spent}
                   limit={budget.limit}
                   label={cat?.name ?? budget.categoryId}
                   icon={cat?.icon ?? '📌'}

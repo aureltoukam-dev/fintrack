@@ -6,11 +6,15 @@ import { useFonts } from 'expo-font';
 import { Sora_400Regular, Sora_600SemiBold } from '@expo-google-fonts/sora';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { openDatabase, runMigrations } from '../db/migrations';
+import { seedDatabase } from '../db/seed';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { useCategoryStore } from '../stores/categoryStore';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const { loadCategories } = useCategoryStore();
   const [fontsLoaded] = useFonts({
     'Sora-Regular': Sora_400Regular,
     'Sora-SemiBold': Sora_600SemiBold,
@@ -21,6 +25,8 @@ export default function RootLayout() {
     try {
       const db = openDatabase();
       runMigrations(db);
+      seedDatabase(db);
+      loadCategories(db);
     } catch (e) {
       console.error('DB init error:', e);
     }
@@ -36,6 +42,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <ErrorBoundary>
       <StatusBar style="light" backgroundColor="#0F0F14" />
       <Stack
         screenOptions={{
@@ -55,7 +62,15 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: '#1A1A24' },
           }}
         />
+        <Stack.Screen
+          name="categories"
+          options={{
+            title: 'Catégories',
+            headerStyle: { backgroundColor: '#1A1A24' },
+          }}
+        />
       </Stack>
+    </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

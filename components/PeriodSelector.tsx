@@ -1,10 +1,10 @@
 import React from 'react';
-import { ScrollView, TouchableOpacity, Text, StyleSheet, View } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { PeriodType } from '../db/schema';
 import { DARK_COLORS as C, SPACING, RADIUS, TYPOGRAPHY as T } from '../constants/theme';
 
 interface PeriodOption {
-  value: PeriodType;
+  value: PeriodType | 'all';
   label: string;
 }
 
@@ -13,22 +13,28 @@ const PERIODS: PeriodOption[] = [
   { value: 'month', label: 'MOIS' },
   { value: 'quarter', label: 'TRIMESTRE' },
   { value: 'year', label: 'ANNÉE' },
-  { value: 'custom', label: 'CUSTOM' },
+];
+
+const PERIODS_WITH_ALL: PeriodOption[] = [
+  { value: 'all', label: 'TOUT' },
+  ...PERIODS,
 ];
 
 interface Props {
-  selected: PeriodType;
-  onSelect: (period: PeriodType) => void;
+  selected: PeriodType | 'all';
+  onSelect: (period: PeriodType | 'all') => void;
+  showAll?: boolean;
 }
 
-export default function PeriodSelector({ selected, onSelect }: Props) {
+export default function PeriodSelector({ selected, onSelect, showAll = false }: Props) {
+  const options = showAll ? PERIODS_WITH_ALL : PERIODS;
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}
     >
-      {PERIODS.map((p) => (
+      {options.map((p) => (
         <TouchableOpacity
           key={p.value}
           onPress={() => onSelect(p.value)}

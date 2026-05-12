@@ -1,7 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import 'react-native-get-random-values'; // Required for uuid
 import { v4 as uuidv4 } from 'uuid';
-import { Transaction, Category, Budget, Settings } from './schema';
+import { Transaction, Budget, Settings } from './schema';
 
 // --- Helper Functions ---
 const getCurrentISODate = (): string => new Date().toISOString();
@@ -113,79 +112,6 @@ export const getTransactionById = (db: SQLite.SQLiteDatabase, id: string): Trans
   const row = db.getFirstSync('SELECT * FROM transactions WHERE id = ?', [id]) as Transaction | null;
   return row;
 };
-
-// --- Categories ---
-// Note: Category CRUD is not explicitly requested but is essential for a functional app.
-// Adding basic functions for completeness.
-
-export const addCategory = (
-  db: SQLite.SQLiteDatabase,
-  category: Omit<Category, 'id' | 'isCustom' | 'isActive'> & { id?: string } // Allow optional id for pre-defined
-): Category => {
-  const id = category.id || uuidv4();
-  const { name, icon, color, type } = category;
-
-  db.runSync(
-    'INSERT INTO categories (id, name, icon, color, type, isCustom, isActive) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, name, icon, color, type, 1, 1] // isCustom and isActive default to true for new ones
-  );
-
-  return { ...category, id, isCustom: true, isActive: true };
-};
-
-export const getCategories = (db: SQLite.SQLiteDatabase, type: 'income' | 'expense' | 'both' = 'both', includeInactive = false): Category[] => {
-  let sql = 'SELECT * FROM categories WHERE 1=1';
-  const params: any[] = [];
-
-  if (type !== 'both') {
-    sql += ' AND type = ?';
-    params.push(type);
-  }
-  if (!includeInactive) {
-    sql += ' AND isActive = ?';
-    params.push(1);
-  }
-
-  sql += ' ORDER BY name ASC';
-
-  const rows = db.getAllSync(sql, params) as Category[];
-  return rows;
-};
-
-export const updateCategory = (db: SQLite.SQLiteDatabase, id: string, data: Partial<Category>): void => {
-  const updates: string[] = [];
-  const params: any[] = [];
-
-  if (data.name !== undefined) {
-    updates.push('name = ?');
-    params.push(data.name);
-  }
-  if (data.icon !== undefined) {
-    updates.push('icon = ?');
-    params.push(data.icon);
-  }
-  if (data.color !== undefined) {
-    updates.push('color = ?');
-    params.push(data.color);
-  }
-  if (data.type !== undefined) {
-    updates.push('type = ?');
-    params.push(data.type);
-  }
-  if (data.isActive !== undefined) {
-    updates.push('isActive = ?');
-    params.push(data.isActive ? 1 : 0);
-  }
-
-  params.push(id);
-  db.runSync(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`, params);
-};
-
-export const deleteCategory = (db: SQLite.SQLiteDatabase, id: string): void => {
-  // Consider soft delete or handling related transactions/budgets
-  db.runSync('DELETE FROM categories WHERE id = ?', [id]);
-};
-
 
 // --- Budgets ---
 export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>): Budget => {

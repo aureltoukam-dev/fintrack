@@ -12,13 +12,43 @@ import { CATEGORIES, getCategoryById } from '../../constants/categories';
 import BudgetProgressBar from '../../components/BudgetProgressBar';
 import NumPad from '../../components/NumPad';
 import PeriodSelector from '../../components/PeriodSelector';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
 import { getPeriodDates } from '../../services/periodFilter';
 import type { PeriodFilterType } from '../../db/schema';
 
 const db = openDatabase();
 
 export default function BudgetsScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    content: { padding: SPACING.lg },
+    summaryCard: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.lg },
+    summaryTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text, marginBottom: SPACING.md },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    summaryItem: { alignItems: 'center' },
+    summaryValue: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.lg, color: C.text },
+    summaryLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2, marginTop: 4 },
+    emptyContainer: { alignItems: 'center', paddingVertical: 60 },
+    emptyIcon: { fontSize: 48, marginBottom: SPACING.md },
+    emptyText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: C.text2 },
+    emptyHint: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text3, marginTop: SPACING.xs, textAlign: 'center' },
+    budgetItem: { marginBottom: SPACING.sm },
+    fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', elevation: 8 },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+    sheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SPACING.xl, paddingBottom: 40 },
+    handle: { width: 40, height: 4, backgroundColor: C.surface3, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
+    sheetTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text, marginBottom: SPACING.lg },
+    catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.lg },
+    catChip: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, backgroundColor: C.surface2, borderRadius: RADIUS.full, minWidth: 80 },
+    catChipActive: { backgroundColor: C.accent },
+    catIcon: { fontSize: 16 },
+    catLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2 },
+    amountDisplay: { backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.lg, alignItems: 'center', marginBottom: SPACING.lg },
+    amountText: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xxl, color: C.text },
+    saveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center' },
+    saveBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: '#FFF' },
+  }), [C]);
   const { budgets, loadBudgets, addBudget, updateBudget, deleteBudget } = useBudgetStore();
   const { transactions, loadTransactions } = useTransactionStore();
   const { getCurrencySymbol, loadSettings } = useSettingsStore();
@@ -191,42 +221,3 @@ export default function BudgetsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: SPACING.lg },
-  summaryCard: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.lg },
-  summaryTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text, marginBottom: SPACING.md },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  summaryItem: { alignItems: 'center' },
-  summaryValue: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.lg, color: C.text },
-  summaryLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2, marginTop: 4 },
-  emptyContainer: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: SPACING.md },
-  emptyText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: C.text2 },
-  emptyHint: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text3, marginTop: SPACING.xs, textAlign: 'center' },
-  budgetItem: { marginBottom: SPACING.sm },
-  fab: {
-    position: 'absolute', bottom: 24, right: 24, width: 56, height: 56,
-    borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', elevation: 8,
-  },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SPACING.xl, paddingBottom: 40 },
-  handle: { width: 40, height: 4, backgroundColor: C.surface3, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
-  sheetTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text, marginBottom: SPACING.lg },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.lg },
-  catChip: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-    paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs,
-    backgroundColor: C.surface2, borderRadius: RADIUS.full, minWidth: 80,
-  },
-  catChipActive: { backgroundColor: C.accent },
-  catIcon: { fontSize: 16 },
-  catLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2 },
-  amountDisplay: {
-    backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.lg,
-    alignItems: 'center', marginBottom: SPACING.lg,
-  },
-  amountText: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xxl, color: C.text },
-  saveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center' },
-  saveBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: '#FFF' },
-});

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ScrollView, Dimensions,
@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { openDatabase } from '../db/migrations';
 import { useSettingsStore } from '../stores/settingsStore';
-import { CURRENCIES, DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
+import { CURRENCIES, useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
 
 const db = openDatabase();
 const { width } = Dimensions.get('window');
@@ -35,6 +35,32 @@ const STEPS = [
 ];
 
 export default function OnboardingScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg, paddingTop: 60 },
+    dots: { flexDirection: 'row', justifyContent: 'center', gap: SPACING.xs, marginBottom: SPACING.xxl },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.surface3 },
+    dotActive: { backgroundColor: C.accent, width: 24 },
+    content: { flex: 1, paddingHorizontal: SPACING.xxl, alignItems: 'center' },
+    emoji: { fontSize: 72, marginBottom: SPACING.lg },
+    title: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text, textAlign: 'center', marginBottom: SPACING.sm },
+    subtitle: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text2, textAlign: 'center', marginBottom: SPACING.xxl },
+    input: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.lg, fontFamily: T.fonts.body, fontSize: T.sizes.lg, color: C.text, width: '100%', textAlign: 'center' },
+    currencyList: { width: '100%', maxHeight: 300 },
+    currencyItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.xs },
+    currencyItemActive: { backgroundColor: C.accent },
+    currencyCode: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.md, color: C.text, width: 48 },
+    currencyInfo: { flex: 1, marginLeft: SPACING.sm },
+    currencySymbol: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text },
+    currencyName: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2 },
+    checkmark: { color: '#FFF', fontFamily: T.fonts.semibold, fontSize: T.sizes.lg },
+    footer: { flexDirection: 'row', padding: SPACING.xxl, gap: SPACING.sm, paddingBottom: 40 },
+    backBtn: { flex: 1, height: 52, borderRadius: RADIUS.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
+    backText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text2 },
+    nextBtn: { flex: 2, height: 52, borderRadius: RADIUS.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+    nextBtnDisabled: { opacity: 0.4 },
+    nextText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: '#FFF' },
+  }), [C]);
   const router = useRouter();
   const { updateSetting } = useSettingsStore();
   const [step, setStep] = useState(0);
@@ -128,36 +154,3 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg, paddingTop: 60 },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: SPACING.xs, marginBottom: SPACING.xxl },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.surface3 },
-  dotActive: { backgroundColor: C.accent, width: 24 },
-  content: { flex: 1, paddingHorizontal: SPACING.xxl, alignItems: 'center' },
-  emoji: { fontSize: 72, marginBottom: SPACING.lg },
-  title: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text, textAlign: 'center', marginBottom: SPACING.sm },
-  subtitle: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text2, textAlign: 'center', marginBottom: SPACING.xxl },
-  input: {
-    backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.lg,
-    fontFamily: T.fonts.body, fontSize: T.sizes.lg, color: C.text,
-    width: '100%', textAlign: 'center',
-  },
-  currencyList: { width: '100%', maxHeight: 300 },
-  currencyItem: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.surface, borderRadius: RADIUS.md,
-    padding: SPACING.md, marginBottom: SPACING.xs,
-  },
-  currencyItemActive: { backgroundColor: C.accent },
-  currencyCode: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.md, color: C.text, width: 48 },
-  currencyInfo: { flex: 1, marginLeft: SPACING.sm },
-  currencySymbol: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text },
-  currencyName: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2 },
-  checkmark: { color: '#FFF', fontFamily: T.fonts.semibold, fontSize: T.sizes.lg },
-  footer: { flexDirection: 'row', padding: SPACING.xxl, gap: SPACING.sm, paddingBottom: 40 },
-  backBtn: { flex: 1, height: 52, borderRadius: RADIUS.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text2 },
-  nextBtn: { flex: 2, height: 52, borderRadius: RADIUS.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  nextBtnDisabled: { opacity: 0.4 },
-  nextText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: '#FFF' },
-});

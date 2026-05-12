@@ -11,11 +11,15 @@ import { seedDatabase } from '../db/seed';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useCategoryStore } from '../stores/categoryStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { ThemeContext, useThemeColors } from '../constants/theme';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const { loadCategories } = useCategoryStore();
+  const { theme, loadSettings: _ls } = useSettingsStore();
+  const colors = useThemeColors(theme);
   const router = useRouter();
   const onboardingChecked = useRef(false);
   const [fontsLoaded] = useFonts({
@@ -52,14 +56,15 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <ThemeContext.Provider value={colors}>
     <ErrorBoundary>
-      <StatusBar style="light" backgroundColor="#0F0F14" />
+      <StatusBar style={theme === 'light' ? 'dark' : 'light'} backgroundColor={colors.bg} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#0F0F14' },
-          headerTintColor: '#F0EFF8',
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.text,
           headerTitleStyle: { fontFamily: 'Sora-SemiBold', fontSize: 18 },
-          contentStyle: { backgroundColor: '#0F0F14' },
+          contentStyle: { backgroundColor: colors.bg },
           animation: 'slide_from_right',
         }}
       >
@@ -69,14 +74,14 @@ export default function RootLayout() {
           options={{
             presentation: 'modal',
             title: 'Nouvelle opération',
-            headerStyle: { backgroundColor: '#1A1A24' },
+            headerStyle: { backgroundColor: colors.surface },
           }}
         />
         <Stack.Screen
           name="categories"
           options={{
             title: 'Catégories',
-            headerStyle: { backgroundColor: '#1A1A24' },
+            headerStyle: { backgroundColor: colors.surface },
           }}
         />
         <Stack.Screen
@@ -85,6 +90,7 @@ export default function RootLayout() {
         />
       </Stack>
     </ErrorBoundary>
+    </ThemeContext.Provider>
     </GestureHandlerRootView>
   );
 }

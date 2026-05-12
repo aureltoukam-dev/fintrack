@@ -13,7 +13,7 @@ import TransactionItem from '../../components/TransactionItem';
 import PeriodSelector from '../../components/PeriodSelector';
 import { Transaction } from '../../db/schema';
 import { getPeriodDates } from '../../services/periodFilter';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
 import type { PeriodFilterType } from '../../db/schema';
 
 const db = openDatabase();
@@ -44,6 +44,38 @@ const EXPENSE_CATEGORIES = CATEGORIES.filter(c => c.type === 'expense' || c.type
 const INCOME_CATEGORIES = CATEGORIES.filter(c => c.type === 'income' || c.type === 'both');
 
 export default function TransactionsScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', margin: SPACING.lg, marginBottom: SPACING.sm, paddingHorizontal: SPACING.md, backgroundColor: C.surface2, borderRadius: RADIUS.md, height: 44 },
+    searchInput: { flex: 1, fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text, height: 44 },
+    filters: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xs },
+    chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: C.surface2, marginRight: SPACING.xs, height: 32, alignSelf: 'flex-start' },
+    chipActive: { backgroundColor: C.accent },
+    chipText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
+    chipTextActive: { color: '#FFF' },
+    chipIcon: { fontSize: 12, marginRight: 3 },
+    chipSeparator: { width: 1, backgroundColor: C.surface3, marginHorizontal: SPACING.xs, height: 20, alignSelf: 'center' },
+    summaryBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, borderBottomWidth: 1, borderBottomColor: C.surface2 },
+    summaryCount: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
+    summaryAmounts: { flexDirection: 'row', gap: SPACING.sm },
+    summaryAmount: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, backgroundColor: C.bg },
+    sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
+    sectionNet: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
+    empty: { textAlign: 'center', color: C.text2, fontFamily: T.fonts.body, padding: SPACING.xl },
+    fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: C.accent, shadowOpacity: 0.4, shadowRadius: 8 },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+    bottomSheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SPACING.xl, paddingBottom: 40, minHeight: 200 },
+    handle: { width: 40, height: 4, backgroundColor: C.surface3, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
+    sheetTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: C.text, marginBottom: SPACING.xs },
+    sheetAmount: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xl, color: C.accent2, marginBottom: SPACING.xs },
+    sheetDate: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.lg },
+    sheetBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.md, borderTopWidth: 1, borderTopColor: C.surface2 },
+    sheetBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md },
+    loadMoreBtn: { alignItems: 'center', padding: SPACING.lg, marginBottom: 80 },
+    loadMoreText: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.accent },
+  }), [C]);
   const router = useRouter();
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [filterPeriod, setFilterPeriod] = useState<PeriodFilterType>('month');
@@ -296,68 +328,3 @@ export default function TransactionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  searchContainer: {
-    flexDirection: 'row', alignItems: 'center',
-    margin: SPACING.lg, marginBottom: SPACING.sm, paddingHorizontal: SPACING.md,
-    backgroundColor: C.surface2, borderRadius: RADIUS.md, height: 44,
-  },
-  searchInput: {
-    flex: 1, fontFamily: T.fonts.body, fontSize: T.sizes.md,
-    color: C.text, height: 44,
-  },
-  filters: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xs },
-  chip: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full, backgroundColor: C.surface2, marginRight: SPACING.xs, height: 32,
-    alignSelf: 'flex-start',
-  },
-  chipActive: { backgroundColor: C.accent },
-  chipText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
-  chipTextActive: { color: '#FFF' },
-  chipIcon: { fontSize: 12, marginRight: 3 },
-  chipSeparator: { width: 1, backgroundColor: C.surface3, marginHorizontal: SPACING.xs, height: 20, alignSelf: 'center' },
-  summaryBar: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs,
-    borderBottomWidth: 1, borderBottomColor: C.surface2,
-  },
-  summaryCount: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
-  summaryAmounts: { flexDirection: 'row', gap: SPACING.sm },
-  summaryAmount: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, backgroundColor: C.bg },
-  sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
-  sectionNet: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xs },
-  empty: { textAlign: 'center', color: C.text2, fontFamily: T.fonts.body, padding: SPACING.xl },
-  fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center',
-    elevation: 8, shadowColor: C.accent, shadowOpacity: 0.4, shadowRadius: 8,
-  },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  bottomSheet: {
-    backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: SPACING.xl, paddingBottom: 40, minHeight: 200,
-  },
-  handle: {
-    width: 40, height: 4, backgroundColor: C.surface3,
-    borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg,
-  },
-  sheetTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: C.text, marginBottom: SPACING.xs },
-  sheetAmount: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.xl, color: C.accent2, marginBottom: SPACING.xs },
-  sheetDate: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.lg },
-  sheetBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
-    paddingVertical: SPACING.md, borderTopWidth: 1, borderTopColor: C.surface2,
-  },
-  sheetBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md },
-  loadMoreBtn: {
-    alignItems: 'center', padding: SPACING.lg, marginBottom: 80,
-  },
-  loadMoreText: {
-    fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.accent,
-  },
-});

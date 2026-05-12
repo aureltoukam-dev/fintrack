@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
 
 interface Props {
   value: string;
@@ -20,6 +20,21 @@ const KEYS = [
 ];
 
 export default function NumPad({ value, onValueChange, onConfirm, visible }: Props) {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    pad: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SPACING.lg, paddingBottom: 40 },
+    display: { backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.lg, alignItems: 'center', marginBottom: SPACING.md, flexDirection: 'row', justifyContent: 'center' },
+    displayText: { fontFamily: 'SpaceMono-Regular', fontSize: 32, color: C.text, flex: 1, textAlign: 'center' },
+    clearBtn: { padding: SPACING.xs },
+    clearText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.danger },
+    row: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
+    key: { flex: 1, height: 56, backgroundColor: C.surface2, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+    keyText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text },
+    confirmBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, height: 56, alignItems: 'center', justifyContent: 'center', marginTop: SPACING.xs },
+    confirmText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: '#FFF' },
+  }), [C]);
+
   const handleKey = async (key: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (key === '⌫') {
@@ -71,39 +86,3 @@ export default function NumPad({ value, onValueChange, onConfirm, visible }: Pro
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  pad: {
-    backgroundColor: C.surface,
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: SPACING.lg, paddingBottom: 40,
-  },
-  display: {
-    backgroundColor: C.surface2, borderRadius: RADIUS.md,
-    padding: SPACING.lg, alignItems: 'center', marginBottom: SPACING.md,
-    flexDirection: 'row', justifyContent: 'center',
-  },
-  displayText: {
-    fontFamily: 'SpaceMono-Regular', fontSize: 32, color: C.text, flex: 1, textAlign: 'center',
-  },
-  clearBtn: { padding: SPACING.xs },
-  clearText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.danger },
-  row: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
-  key: {
-    flex: 1, height: 56, backgroundColor: C.surface2, borderRadius: RADIUS.md,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  keyText: {
-    fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text,
-  },
-  confirmBtn: {
-    backgroundColor: C.accent, borderRadius: RADIUS.md, height: 56,
-    alignItems: 'center', justifyContent: 'center', marginTop: SPACING.xs,
-  },
-  confirmText: {
-    fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: '#FFF',
-  },
-});

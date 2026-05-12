@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ScrollView, Alert, Animated,
@@ -12,11 +12,37 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useCategoryStore } from '../stores/categoryStore';
 import { getTransactionById } from '../db/queries';
 import NumPad from '../components/NumPad';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
 
 const db = openDatabase();
 
 export default function AddScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    content: { padding: SPACING.lg, paddingBottom: 40 },
+    typeToggle: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
+    typeBtn: { flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
+    typeBtnExpense: { backgroundColor: C.danger },
+    typeBtnIncome: { backgroundColor: C.accent2 },
+    typeText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text2 },
+    amountBox: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.xl, alignItems: 'center', marginBottom: SPACING.lg },
+    amountText: { fontFamily: 'SpaceMono-Regular', fontSize: 40, fontWeight: '600' },
+    tapHint: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3, marginTop: SPACING.xs },
+    label: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+    categoriesScroll: { marginBottom: SPACING.lg },
+    catChip: { alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, marginRight: SPACING.xs, borderRadius: RADIUS.md, backgroundColor: C.surface2, minWidth: 72 },
+    catIcon: { fontSize: 20, marginBottom: 2 },
+    catLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2, textAlign: 'center' },
+    noteInput: { backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.md, fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text, minHeight: 80, textAlignVertical: 'top', marginBottom: SPACING.lg },
+    datePicker: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.lg },
+    dateText: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text },
+    saveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center', height: 52, justifyContent: 'center' },
+    saveBtnDisabled: { opacity: 0.4 },
+    saveBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: '#FFF' },
+    toast: { position: 'absolute', bottom: 100, left: 24, right: 24, backgroundColor: C.surface3, borderRadius: RADIUS.md, padding: SPACING.md, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+    toastText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text },
+  }), [C]);
   const router = useRouter();
   const { txId } = useLocalSearchParams<{ txId?: string }>();
   const isEdit = !!txId;
@@ -183,43 +209,3 @@ export default function AddScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: SPACING.lg, paddingBottom: 40 },
-  typeToggle: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
-  typeBtn: { flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
-  typeBtnExpense: { backgroundColor: C.danger },
-  typeBtnIncome: { backgroundColor: C.accent2 },
-  typeText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text2 },
-  amountBox: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.xl, alignItems: 'center', marginBottom: SPACING.lg },
-  amountText: { fontFamily: 'SpaceMono-Regular', fontSize: 40, fontWeight: '600' },
-  tapHint: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3, marginTop: SPACING.xs },
-  label: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
-  categoriesScroll: { marginBottom: SPACING.lg },
-  catChip: {
-    alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs,
-    marginRight: SPACING.xs, borderRadius: RADIUS.md, backgroundColor: C.surface2, minWidth: 72,
-  },
-  catIcon: { fontSize: 20, marginBottom: 2 },
-  catLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2, textAlign: 'center' },
-  noteInput: {
-    backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.md,
-    fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text,
-    minHeight: 80, textAlignVertical: 'top', marginBottom: SPACING.lg,
-  },
-  datePicker: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
-    backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.lg,
-  },
-  dateText: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text },
-  saveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center', height: 52, justifyContent: 'center' },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: '#FFF' },
-  toast: {
-    position: 'absolute', bottom: 100, left: 24, right: 24,
-    backgroundColor: '#2A2A3A', borderRadius: RADIUS.md, padding: SPACING.md,
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
-  },
-  toastText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: '#FFF' },
-});

@@ -10,8 +10,9 @@ interface SettingsState {
   theme: 'dark' | 'light' | 'auto';
   dateFormat: string;
   notifyBudget: boolean;
+  budgetAlertThreshold: number;
   notifyReminder: boolean;
-  reminderTime?: string;
+  reminderTime: string;
   isLoaded: boolean;
 }
 
@@ -28,8 +29,9 @@ const defaults: SettingsState = {
   theme: 'dark',
   dateFormat: 'DD/MM/YYYY',
   notifyBudget: true,
+  budgetAlertThreshold: 80,
   notifyReminder: false,
-  reminderTime: undefined,
+  reminderTime: '20:00',
   isLoaded: false,
 };
 
@@ -40,9 +42,10 @@ function parseSettings(raw: Record<string, string>): Partial<SettingsState> {
     name: raw.name ?? defaults.name,
     theme: (raw.theme as SettingsState['theme']) ?? defaults.theme,
     dateFormat: raw.dateFormat ?? defaults.dateFormat,
-    notifyBudget: raw.notifyBudget === 'true',
+    notifyBudget: raw.notifyBudget !== 'false',
+    budgetAlertThreshold: raw.budgetAlertThreshold ? parseInt(raw.budgetAlertThreshold, 10) : defaults.budgetAlertThreshold,
     notifyReminder: raw.notifyReminder === 'true',
-    reminderTime: raw.reminderTime,
+    reminderTime: raw.reminderTime ?? defaults.reminderTime,
     isLoaded: true,
   };
 }

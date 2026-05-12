@@ -9,6 +9,9 @@ import {
   getPeriodStats,
   getCategoryStats,
 } from '../db/queries';
+import { checkAndAlertBudgets } from '../services/notificationService';
+import { useSettingsStore } from './settingsStore';
+import { useCategoryStore } from './categoryStore';
 
 interface TransactionFilters {
   type?: 'income' | 'expense';
@@ -41,12 +44,28 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   addTransaction: (db, data) => {
     const tx = addTransaction(db, data);
     get().loadTransactions(db);
+    if (data.type === 'expense') {
+      const { notifyBudget, budgetAlertThreshold } = useSettingsStore.getState();
+      if (notifyBudget) {
+        const monthKey = data.date.slice(0, 7);
+        const { allCategories } = useCategoryStore.getState();
+        checkAndAlertBudgets(db, monthKey, budgetAlertThreshold, allCategories).catch(() => {});
+      }
+    }
     return tx;
   },
 
   updateTransaction: (db, id, data) => {
     updateTransaction(db, id, data);
     get().loadTransactions(db);
+    if (data.type === 'expense' && data.date) {
+      const { notifyBudget, budgetAlertThreshold } = useSettingsStore.getState();
+      if (notifyBudget) {
+        const monthKey = data.date.slice(0, 7);
+        const { allCategories } = useCategoryStore.getState();
+        checkAndAlertBudgets(db, monthKey, budgetAlertThreshold, allCategories).catch(() => {});
+      }
+    }
   },
 
   deleteTransaction: (db, id) => {

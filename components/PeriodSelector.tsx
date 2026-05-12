@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { PeriodType } from '../db/schema';
-import { DARK_COLORS as C, SPACING, RADIUS, TYPOGRAPHY as T } from '../constants/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY as T } from '../constants/theme';
 
 interface PeriodOption {
   value: PeriodType | 'all';
@@ -27,6 +27,33 @@ interface Props {
 }
 
 export default function PeriodSelector({ selected, onSelect, showAll = false }: Props) {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+    },
+    tab: {
+      height: 36,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.full,
+      backgroundColor: C.surface2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 44,
+    },
+    tabActive: { backgroundColor: C.accent },
+    label: {
+      fontFamily: T.fonts.semibold,
+      fontSize: T.sizes.xs,
+      color: C.text2,
+      letterSpacing: 0.5,
+    },
+    labelActive: { color: '#FFFFFF' },
+  }), [C]);
+
   const options = showAll ? PERIODS_WITH_ALL : PERIODS;
   return (
     <ScrollView
@@ -51,33 +78,3 @@ export default function PeriodSelector({ selected, onSelect, showAll = false }: 
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-  },
-  tab: {
-    height: 36,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.full,
-    backgroundColor: C.surface2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 44,
-  },
-  tabActive: {
-    backgroundColor: C.accent,
-  },
-  label: {
-    fontFamily: T.fonts.semibold,
-    fontSize: T.sizes.xs,
-    color: C.text2,
-    letterSpacing: 0.5,
-  },
-  labelActive: {
-    color: '#FFFFFF',
-  },
-});

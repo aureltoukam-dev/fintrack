@@ -15,11 +15,25 @@ import BarChart from '../../components/BarChart';
 import DonutChart from '../../components/DonutChart';
 import TransactionItem from '../../components/TransactionItem';
 import { PeriodType } from '../../db/schema';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T } from '../../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T } from '../../constants/theme';
 
 const db = openDatabase();
 
 export default function DashboardScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    content: { paddingBottom: 16 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.sm },
+    greeting: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text },
+    subtitle: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text2, marginTop: 2 },
+    section: { paddingHorizontal: SPACING.lg, marginTop: SPACING.lg },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+    sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text, marginBottom: SPACING.sm },
+    seeAll: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.accent },
+    empty: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text2, textAlign: 'center', padding: SPACING.lg },
+    fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', shadowColor: C.accent, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
+  }), [C]);
   const router = useRouter();
   const [period, setPeriod] = useState<Exclude<PeriodType, 'custom'>>('month');
   const [refreshing, setRefreshing] = useState(false);
@@ -153,24 +167,3 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { paddingBottom: 16 },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.sm,
-  },
-  greeting: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text },
-  subtitle: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text2, marginTop: 2 },
-  section: { paddingHorizontal: SPACING.lg, marginTop: SPACING.lg },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
-  sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text, marginBottom: SPACING.sm },
-  seeAll: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.accent },
-  empty: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text2, textAlign: 'center', padding: SPACING.lg },
-  fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.accent, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
-  },
-});

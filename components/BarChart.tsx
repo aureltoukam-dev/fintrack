@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { G, Rect, Text as SvgText, Line } from 'react-native-svg';
+import { useTheme } from '../constants/theme';
 
 interface BarChartProps {
   data: { label: string; income: number; expense: number }[];
@@ -8,6 +9,7 @@ interface BarChartProps {
 }
 
 const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
+  const C = useTheme();
   const chartHeight = height;
   const screenWidth = Dimensions.get('window').width;
   const horizontalPadding = 48;
@@ -17,13 +19,6 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
   const barGroupWidth = data.length > 0 ? drawWidth / data.length : 40;
   const barWidth = Math.min(Math.max(barGroupWidth * 0.3, 6), 20);
   const gridLineCount = 4;
-  const legendHeight = 36;
-  const backgroundColor = '#1A1A24';
-  const incomeColor = '#4ECDC4';
-  const expenseColor = '#7C6FFF';
-  const gridLineColor = '#2A2A3A';
-  const textColor = '#FFFFFF';
-  const labelColor = '#888899';
   const drawHeight = chartHeight - 40;
 
   const maxValue = useMemo(() => {
@@ -44,14 +39,14 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
           y1={y.toString()}
           x2={svgWidth.toString()}
           y2={y.toString()}
-          stroke={gridLineColor}
+          stroke={C.surface3}
           strokeDasharray="4,4"
           strokeWidth="1"
         />
         <SvgText
           x={(horizontalPadding - 4).toString()}
           y={(y + 4).toString()}
-          fill={labelColor}
+          fill={C.text2}
           fontSize="9"
           textAnchor="end"
         >
@@ -74,7 +69,7 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
           y={(drawHeight - incomH).toString()}
           width={barWidth.toString()}
           height={Math.max(incomH, 0).toString()}
-          fill={incomeColor}
+          fill={C.accent2}
           rx="3"
           ry="3"
         />
@@ -83,14 +78,14 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
           y={(drawHeight - expensH).toString()}
           width={barWidth.toString()}
           height={Math.max(expensH, 0).toString()}
-          fill={expenseColor}
+          fill={C.accent}
           rx="3"
           ry="3"
         />
         <SvgText
           x={groupCenterX.toString()}
           y={(drawHeight + 16).toString()}
-          fill={labelColor}
+          fill={C.text2}
           fontSize="9"
           textAnchor="middle"
           fontWeight="bold"
@@ -101,8 +96,18 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
     );
   });
 
+  const styles = useMemo(() => StyleSheet.create({
+    container: { backgroundColor: C.surface, borderRadius: 12, overflow: 'hidden', position: 'relative', paddingBottom: 8 },
+    legendContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingBottom: 8, gap: 16 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendDot: { width: 10, height: 10, borderRadius: 5 },
+    legendText: { fontSize: 12, fontFamily: 'Sora-Regular', color: C.text },
+    noDataOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: C.overlay, borderRadius: 12 },
+    noDataText: { color: C.text, fontSize: 14, fontWeight: '600' },
+  }), [C]);
+
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <View style={styles.container}>
       <Svg height={chartHeight} width={svgWidth} viewBox={`0 0 ${svgWidth} ${chartHeight}`}>
         <G transform="translate(0, 10)">
           {gridLines}
@@ -111,12 +116,12 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
       </Svg>
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: incomeColor }]} />
-          <Text style={[styles.legendText, { color: textColor }]}>Revenus</Text>
+          <View style={[styles.legendDot, { backgroundColor: C.accent2 }]} />
+          <Text style={styles.legendText}>Revenus</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: expenseColor }]} />
-          <Text style={[styles.legendText, { color: textColor }]}>Dépenses</Text>
+          <View style={[styles.legendDot, { backgroundColor: C.accent }]} />
+          <Text style={styles.legendText}>Dépenses</Text>
         </View>
       </View>
       {!hasData && (
@@ -127,30 +132,5 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
-    paddingBottom: 8,
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 8,
-    gap: 16,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 12, fontFamily: 'Sora-Regular' },
-  noDataOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(26, 26, 36, 0.8)', borderRadius: 12,
-  },
-  noDataText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-});
 
 export default BarChart;

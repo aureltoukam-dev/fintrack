@@ -9,10 +9,12 @@ import { openDatabase, runMigrations } from '../db/migrations';
 import { seedDatabase } from '../db/seed';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { useCategoryStore } from '../stores/categoryStore';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const { loadCategories } = useCategoryStore();
   const [fontsLoaded] = useFonts({
     'Sora-Regular': Sora_400Regular,
     'Sora-SemiBold': Sora_600SemiBold,
@@ -24,6 +26,7 @@ export default function RootLayout() {
       const db = openDatabase();
       runMigrations(db);
       seedDatabase(db);
+      loadCategories(db);
     } catch (e) {
       console.error('DB init error:', e);
     }
@@ -56,6 +59,13 @@ export default function RootLayout() {
           options={{
             presentation: 'modal',
             title: 'Nouvelle opération',
+            headerStyle: { backgroundColor: '#1A1A24' },
+          }}
+        />
+        <Stack.Screen
+          name="categories"
+          options={{
+            title: 'Catégories',
             headerStyle: { backgroundColor: '#1A1A24' },
           }}
         />

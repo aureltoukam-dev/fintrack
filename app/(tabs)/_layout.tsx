@@ -1,19 +1,14 @@
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-
-const C = {
-  bg: '#1A1A24',
-  accent: '#7C6FFF',
-  inactive: '#5C5A72',
-  border: '#22222F',
-};
+import { useTheme } from '../../constants/theme';
 
 export default function TabLayout() {
+  const C = useTheme();
   return (
     <Tabs
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: C.bg,
+          backgroundColor: C.surface,
           borderTopColor: C.border,
           borderTopWidth: 1,
           height: 60,
@@ -21,10 +16,10 @@ export default function TabLayout() {
           paddingTop: 4,
         },
         tabBarActiveTintColor: C.accent,
-        tabBarInactiveTintColor: C.inactive,
+        tabBarInactiveTintColor: C.text3,
         tabBarLabelStyle: { fontFamily: 'Sora-Regular', fontSize: 10 },
-        headerStyle: { backgroundColor: '#0F0F14' },
-        headerTintColor: '#F0EFF8',
+        headerStyle: { backgroundColor: C.bg },
+        headerTintColor: C.text,
         headerTitleStyle: { fontFamily: 'Sora-SemiBold', fontSize: 18 },
       }}
     >

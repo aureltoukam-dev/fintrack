@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, Alert,
@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { openDatabase } from '../db/migrations';
 import { useCategoryStore } from '../stores/categoryStore';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
 
 const db = openDatabase();
 
@@ -26,6 +26,45 @@ const PRESET_ICONS = [
 type CategoryType = 'expense' | 'income';
 
 export default function CategoriesScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    content: { padding: SPACING.lg },
+    sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.sm, letterSpacing: 0.5 },
+    card: { backgroundColor: C.surface, borderRadius: RADIUS.lg, overflow: 'hidden' },
+    row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
+    rowBorder: { borderBottomWidth: 1, borderBottomColor: C.surface2 },
+    dot: { width: 10, height: 10, borderRadius: 5, marginRight: SPACING.sm },
+    icon: { fontSize: 18, marginRight: SPACING.sm },
+    name: { flex: 1, fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text },
+    typeBadge: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
+    actions: { flexDirection: 'row', gap: SPACING.sm },
+    actionBtn: { padding: SPACING.xs },
+    emptyBox: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.xl, alignItems: 'center' },
+    emptyText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text2 },
+    emptyHint: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text3, marginTop: 4 },
+    fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', elevation: 8 },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+    sheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SPACING.xl, paddingBottom: 40, maxHeight: '85%' },
+    handle: { width: 40, height: 4, backgroundColor: C.surface3, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
+    sheetTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text, marginBottom: SPACING.lg },
+    label: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xs, color: C.text2, marginBottom: SPACING.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+    input: { backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.md, fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text, marginBottom: SPACING.md },
+    typeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+    typeBtn: { flex: 1, height: 40, borderRadius: RADIUS.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
+    typeBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
+    iconPicker: { marginBottom: SPACING.md },
+    iconOption: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.xs },
+    iconOptionText: { fontSize: 24 },
+    colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
+    colorDot: { width: 32, height: 32, borderRadius: 16 },
+    colorDotActive: { borderWidth: 3, borderColor: '#FFF' },
+    preview: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.lg, gap: SPACING.sm },
+    previewIcon: { fontSize: 28 },
+    previewName: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg },
+    saveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center' },
+    saveBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: '#FFF' },
+  }), [C]);
   const router = useRouter();
   const { customCategories, allCategories, loadCategories, addCategory, updateCategory, deleteCategory } = useCategoryStore();
 
@@ -209,41 +248,3 @@ export default function CategoriesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: SPACING.lg },
-  sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.sm, letterSpacing: 0.5 },
-  card: { backgroundColor: C.surface, borderRadius: RADIUS.lg, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: C.surface2 },
-  dot: { width: 10, height: 10, borderRadius: 5, marginRight: SPACING.sm },
-  icon: { fontSize: 18, marginRight: SPACING.sm },
-  name: { flex: 1, fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text },
-  typeBadge: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
-  actions: { flexDirection: 'row', gap: SPACING.sm },
-  actionBtn: { padding: SPACING.xs },
-  emptyBox: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.xl, alignItems: 'center' },
-  emptyText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text2 },
-  emptyHint: { fontFamily: T.fonts.body, fontSize: T.sizes.sm, color: C.text3, marginTop: 4 },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', elevation: 8 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SPACING.xl, paddingBottom: 40, maxHeight: '85%' },
-  handle: { width: 40, height: 4, backgroundColor: C.surface3, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
-  sheetTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xl, color: C.text, marginBottom: SPACING.lg },
-  label: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xs, color: C.text2, marginBottom: SPACING.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { backgroundColor: C.surface2, borderRadius: RADIUS.md, padding: SPACING.md, fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text, marginBottom: SPACING.md },
-  typeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
-  typeBtn: { flex: 1, height: 40, borderRadius: RADIUS.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
-  typeBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2 },
-  iconPicker: { marginBottom: SPACING.md },
-  iconOption: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.xs },
-  iconOptionText: { fontSize: 24 },
-  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
-  colorDot: { width: 32, height: 32, borderRadius: 16 },
-  colorDotActive: { borderWidth: 3, borderColor: '#FFF' },
-  preview: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.lg, gap: SPACING.sm },
-  previewIcon: { fontSize: 28 },
-  previewName: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg },
-  saveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center' },
-  saveBtnText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: '#FFF' },
-});

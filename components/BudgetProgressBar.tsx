@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
-import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
+import { useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
 
 interface Props {
   spent: number;
@@ -12,6 +12,22 @@ interface Props {
 }
 
 export default function BudgetProgressBar({ spent, limit, label, icon, currencySymbol, onPress }: Props) {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.lg },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+    labelRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+    icon: { fontSize: 20 },
+    label: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text },
+    warning: { fontSize: 16 },
+    percent: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.sm, color: C.text2 },
+    track: { height: 8, backgroundColor: C.surface3, borderRadius: 4, overflow: 'hidden', marginBottom: SPACING.xs },
+    bar: { height: '100%', borderRadius: 4 },
+    amounts: { flexDirection: 'row', alignItems: 'center' },
+    spent: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2 },
+    limit: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
+  }), [C]);
+
   const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
   const barAnim = useRef(new Animated.Value(0)).current;
 
@@ -58,23 +74,3 @@ export default function BudgetProgressBar({ spent, limit, label, icon, currencyS
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.lg,
-  },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-  icon: { fontSize: 20 },
-  label: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md, color: C.text },
-  warning: { fontSize: 16 },
-  percent: { fontFamily: 'SpaceMono-Regular', fontSize: T.sizes.sm, color: C.text2 },
-  track: { height: 8, backgroundColor: C.surface3, borderRadius: 4, overflow: 'hidden', marginBottom: SPACING.xs },
-  bar: { height: '100%', borderRadius: 4 },
-  amounts: { flexDirection: 'row', alignItems: 'center' },
-  spent: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text2 },
-  limit: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3 },
-});

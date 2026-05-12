@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Transaction, Budget, Category } from '../db/schema'; // Assuming these types are defined elsewhere
 import { SQLiteDatabase } from 'expo-sqlite'; // Assuming you are using expo-sqlite

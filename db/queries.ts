@@ -1,7 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import 'react-native-get-random-values'; // Required for uuid
 import { v4 as uuidv4 } from 'uuid';
-import { Transaction, Category, Budget, Settings } from './schema';
+import { Transaction, Budget, Settings } from './schema';
 
 // --- Helper Functions ---
 const getCurrentISODate = (): string => new Date().toISOString();
@@ -114,83 +113,20 @@ export const getTransactionById = (db: SQLite.SQLiteDatabase, id: string): Trans
   return row;
 };
 
-// --- Categories ---
-// Note: Category CRUD is not explicitly requested but is essential for a functional app.
-// Adding basic functions for completeness.
-
-export const addCategory = (
-  db: SQLite.SQLiteDatabase,
-  category: Omit<Category, 'id' | 'isCustom' | 'isActive'> & { id?: string } // Allow optional id for pre-defined
-): Category => {
-  const id = category.id || uuidv4();
-  const { name, icon, color, type } = category;
-
-  db.runSync(
-    'INSERT INTO categories (id, name, icon, color, type, isCustom, isActive) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, name, icon, color, type, 1, 1] // isCustom and isActive default to true for new ones
-  );
-
-  return { ...category, id, isCustom: true, isActive: true };
-};
-
-export const getCategories = (db: SQLite.SQLiteDatabase, type: 'income' | 'expense' | 'both' = 'both', includeInactive = false): Category[] => {
-  let sql = 'SELECT * FROM categories WHERE 1=1';
-  const params: any[] = [];
-
-  if (type !== 'both') {
-    sql += ' AND type = ?';
-    params.push(type);
-  }
-  if (!includeInactive) {
-    sql += ' AND isActive = ?';
-    params.push(1);
-  }
-
-  sql += ' ORDER BY name ASC';
-
-  const rows = db.getAllSync(sql, params) as Category[];
-  return rows;
-};
-
-export const updateCategory = (db: SQLite.SQLiteDatabase, id: string, data: Partial<Category>): void => {
-  const updates: string[] = [];
-  const params: any[] = [];
-
-  if (data.name !== undefined) {
-    updates.push('name = ?');
-    params.push(data.name);
-  }
-  if (data.icon !== undefined) {
-    updates.push('icon = ?');
-    params.push(data.icon);
-  }
-  if (data.color !== undefined) {
-    updates.push('color = ?');
-    params.push(data.color);
-  }
-  if (data.type !== undefined) {
-    updates.push('type = ?');
-    params.push(data.type);
-  }
-  if (data.isActive !== undefined) {
-    updates.push('isActive = ?');
-    params.push(data.isActive ? 1 : 0);
-  }
-
-  params.push(id);
-  db.runSync(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`, params);
-};
-
-export const deleteCategory = (db: SQLite.SQLiteDatabase, id: string): void => {
-  // Consider soft delete or handling related transactions/budgets
-  db.runSync('DELETE FROM categories WHERE id = ?', [id]);
-};
-
-
 // --- Budgets ---
 export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>): Budget => {
   const { categoryId, limit, month } = budget;
-  const existing = getBudgetByCategoryId(db, categoryId);
+  const monthVal = month ?? null;
+  // Check if a budget already exists for this category+month combination
+  const existing = monthVal
+    ? (db.getFirstSync(
+        'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ? AND month = ?',
+        [categoryId, monthVal]
+      ) as Budget | null)
+    : (db.getFirstSync(
+        'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ? AND month IS NULL',
+        [categoryId]
+      ) as Budget | null);
   if (existing) {
     updateBudget(db, existing.id, limit);
     return { ...existing, limit };
@@ -198,9 +134,9 @@ export const addBudget = (db: SQLite.SQLiteDatabase, budget: Omit<Budget, 'id'>)
   const id = uuidv4();
   db.runSync(
     'INSERT INTO budgets (id, categoryId, limit_amount, month) VALUES (?, ?, ?, ?)',
-    [id, categoryId, limit, month ?? null]
+    [id, categoryId, limit, monthVal]
   );
-  return { id, categoryId, limit, month };
+  return { id, categoryId, limit, month: monthVal ?? undefined };
 };
 
 export const updateBudget = (db: SQLite.SQLiteDatabase, id: string, limit: number): void => {
@@ -211,16 +147,33 @@ export const deleteBudget = (db: SQLite.SQLiteDatabase, id: string): void => {
   db.runSync('DELETE FROM budgets WHERE id = ?', [id]);
 };
 
-export const getBudgets = (db: SQLite.SQLiteDatabase): Budget[] => {
-  const rows = db.getAllSync(
-    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets ORDER BY categoryId ASC'
+// Returns budgets for a given month + recurring budgets (month IS NULL)
+// If monthKey is null, returns all budgets
+export const getBudgets = (db: SQLite.SQLiteDatabase, monthKey?: string | null): Budget[] => {
+  if (monthKey) {
+    // Recurring OR specific to this month — prefer specific over recurring per category
+    const rows = db.getAllSync(
+      `SELECT id, categoryId, limit_amount as "limit", month FROM budgets
+       WHERE month IS NULL OR month = ?
+       ORDER BY categoryId ASC, month DESC`,
+      [monthKey]
+    ) as Budget[];
+    // Deduplicate: if both recurring and monthly exist, keep the monthly one
+    const seen = new Set<string>();
+    return rows.filter(b => {
+      if (seen.has(b.categoryId)) return false;
+      seen.add(b.categoryId);
+      return true;
+    });
+  }
+  return db.getAllSync(
+    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets ORDER BY categoryId ASC, month ASC'
   ) as Budget[];
-  return rows;
 };
 
 export const getBudgetByCategoryId = (db: SQLite.SQLiteDatabase, categoryId: string): Budget | null => {
   const row = db.getFirstSync(
-    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ?',
+    'SELECT id, categoryId, limit_amount as "limit", month FROM budgets WHERE categoryId = ? AND month IS NULL',
     [categoryId]
   ) as Budget | null;
   return row;

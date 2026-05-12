@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, TextInput, Modal, Alert,
@@ -10,7 +10,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useBudgetStore } from '../../stores/budgetStore';
 import { exportToJSON, importFromJSON, exportToCSV } from '../../services/exportService';
-import { CURRENCIES, DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
+import { CURRENCIES, useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
 
 const db = openDatabase();
 
@@ -25,7 +25,7 @@ const DATE_FORMATS = [
   { value: 'MM/DD/YYYY', label: 'MM/JJ/AAAA' },
 ];
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, styles }: { title: string; children: React.ReactNode; styles: any }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -34,7 +34,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children, styles }: { label: string; children: React.ReactNode; styles: any }) {
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -44,6 +44,32 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default function SettingsScreen() {
+  const C = useTheme();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    content: { padding: SPACING.lg, paddingBottom: 40 },
+    section: { marginBottom: SPACING.lg },
+    sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+    sectionContent: { backgroundColor: C.surface, borderRadius: RADIUS.lg, overflow: 'hidden' },
+    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: C.surface2 },
+    rowLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text },
+    input: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text, textAlign: 'right', minWidth: 120 },
+    chips: { flexDirection: 'row', gap: SPACING.xs },
+    chip: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: C.surface2 },
+    chipActive: { backgroundColor: C.accent },
+    chipText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xs, color: C.text2 },
+    chipTextActive: { color: '#FFF' },
+    actionBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: C.surface2 },
+    actionText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md },
+    infoBox: { alignItems: 'center', paddingVertical: SPACING.xl },
+    infoText: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3, marginBottom: 4 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+    modalBox: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.xl, width: '80%' },
+    modalTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: C.text, marginBottom: SPACING.sm },
+    modalText: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text2, marginBottom: SPACING.lg },
+    modalBtns: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end' },
+    modalBtn: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, backgroundColor: C.surface2 },
+  }), [C]);
   const router = useRouter();
   const store = useSettingsStore();
   const { transactions, loadTransactions } = useTransactionStore();
@@ -93,8 +119,8 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Profil */}
-      <Section title="Profil">
-        <Row label="Prénom">
+      <Section title="Profil" styles={styles}>
+        <Row label="Prénom" styles={styles}>
           <TextInput
             style={styles.input}
             value={store.name}
@@ -106,8 +132,8 @@ export default function SettingsScreen() {
       </Section>
 
       {/* Préférences */}
-      <Section title="Préférences">
-        <Row label="Devise">
+      <Section title="Préférences" styles={styles}>
+        <Row label="Devise" styles={styles}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chips}>
               {CURRENCIES.map(cur => (
@@ -124,7 +150,7 @@ export default function SettingsScreen() {
             </View>
           </ScrollView>
         </Row>
-        <Row label="Thème">
+        <Row label="Thème" styles={styles}>
           <View style={styles.chips}>
             {THEMES.map(t => (
               <TouchableOpacity
@@ -139,7 +165,7 @@ export default function SettingsScreen() {
             ))}
           </View>
         </Row>
-        <Row label="Format date">
+        <Row label="Format date" styles={styles}>
           <View style={styles.chips}>
             {DATE_FORMATS.map(f => (
               <TouchableOpacity
@@ -157,8 +183,8 @@ export default function SettingsScreen() {
       </Section>
 
       {/* Notifications */}
-      <Section title="Notifications">
-        <Row label="Alertes budget">
+      <Section title="Notifications" styles={styles}>
+        <Row label="Alertes budget" styles={styles}>
           <Switch
             value={store.notifyBudget}
             onValueChange={v => update('notifyBudget', String(v))}
@@ -166,7 +192,7 @@ export default function SettingsScreen() {
             thumbColor="#FFF"
           />
         </Row>
-        <Row label="Rappels quotidiens">
+        <Row label="Rappels quotidiens" styles={styles}>
           <Switch
             value={store.notifyReminder}
             onValueChange={v => update('notifyReminder', String(v))}
@@ -177,7 +203,7 @@ export default function SettingsScreen() {
       </Section>
 
       {/* Catégories */}
-      <Section title="Catégories">
+      <Section title="Catégories" styles={styles}>
         <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/categories')}>
           <Feather name="tag" size={18} color={C.accent} />
           <Text style={[styles.actionText, { color: C.accent }]}>Gérer les catégories</Text>
@@ -186,7 +212,7 @@ export default function SettingsScreen() {
       </Section>
 
       {/* Données */}
-      <Section title="Données">
+      <Section title="Données" styles={styles}>
         <TouchableOpacity style={styles.actionBtn} onPress={handleExportJSON}>
           <Feather name="download" size={18} color={C.accent} />
           <Text style={[styles.actionText, { color: C.accent }]}>Exporter JSON</Text>
@@ -234,28 +260,3 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: SPACING.lg, paddingBottom: 40 },
-  section: { marginBottom: SPACING.lg },
-  sectionTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.sm, color: C.text2, marginBottom: SPACING.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
-  sectionContent: { backgroundColor: C.surface, borderRadius: RADIUS.lg, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: C.surface2 },
-  rowLabel: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text },
-  input: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text, textAlign: 'right', minWidth: 120 },
-  chips: { flexDirection: 'row', gap: SPACING.xs },
-  chip: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: C.surface2 },
-  chipActive: { backgroundColor: C.accent },
-  chipText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.xs, color: C.text2 },
-  chipTextActive: { color: '#FFF' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: C.surface2 },
-  actionText: { fontFamily: T.fonts.semibold, fontSize: T.sizes.md },
-  infoBox: { alignItems: 'center', paddingVertical: SPACING.xl },
-  infoText: { fontFamily: T.fonts.body, fontSize: T.sizes.xs, color: C.text3, marginBottom: 4 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: C.surface, borderRadius: RADIUS.lg, padding: SPACING.xl, width: '80%' },
-  modalTitle: { fontFamily: T.fonts.semibold, fontSize: T.sizes.lg, color: C.text, marginBottom: SPACING.sm },
-  modalText: { fontFamily: T.fonts.body, fontSize: T.sizes.md, color: C.text2, marginBottom: SPACING.lg },
-  modalBtns: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end' },
-  modalBtn: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, backgroundColor: C.surface2 },
-});

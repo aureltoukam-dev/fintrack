@@ -11,242 +11,123 @@ interface DonutChartProps {
 }
 
 const DonutChart: React.FC<DonutChartProps> = ({ data, total, currencySymbol = '' }) => {
-  const containerWidth = 300; // Fixed width for the container
-  const svgSize = containerWidth * 0.8; // SVG will be smaller than container
-  const radius = svgSize / 2;
-  const innerRadius = radius * 0.45;
+  const size = 220;
+  const radius = size / 2;
+  const innerRadius = radius * 0.55;
   const strokeWidth = radius - innerRadius;
-  const centerX = svgSize / 2;
-  const centerY = svgSize / 2;
+  const cx = size / 2;
+  const cy = size / 2;
   const backgroundColor = '#1A1A24';
   const textColor = '#FFFFFF';
   const labelColor = '#888899';
-  const noDataText = 'Aucune dépense sur cette période';
 
-  const [animatedPaths, setAnimatedPaths] = useState<Animated.Value[]>([]);
-  const [pathData, setPathData] = useState<any[]>([]);
+  const [animValues] = useState<Animated.Value[]>([]);
+  const [pathData, setPathData] = useState<{ path: string; color: string; categoryId: string; label: string; icon: string; percentage: number; animVal: Animated.Value }[]>([]);
 
   const maxSegments = 5;
-
-  const processedData = data
-    .slice(0, maxSegments)
-    .map(item => ({
-      ...item,
-      percentage: total > 0 ? (item.amount / total) * 100 : 0,
-    }));
-
-  const otherAmount = data.slice(maxSegments).reduce((sum, item) => sum + item.amount, 0);
-  const otherPercentage = total > 0 ? (otherAmount / total) * 100 : 0;
-
+  const processedData = data.slice(0, maxSegments);
+  const otherAmount = data.slice(maxSegments).reduce((s, i) => s + i.amount, 0);
   const finalData = [
     ...processedData,
-    ...(otherAmount > 0 ? [{
-      categoryId: 'other',
-      label: 'Autres',
-      icon: '?', // Placeholder icon for 'other'
-      amount: otherAmount,
-      color: '#CCCCCC', // Default color for 'other'
-      percentage: otherPercentage,
-    }] : []),
-  ];
+    ...(otherAmount > 0 ? [{ categoryId: 'other', label: 'Autres', icon: '…', amount: otherAmount, color: '#9896B0' }] : []),
+  ].filter(d => d.amount > 0);
 
-  const hasData = finalData.length > 0 && finalData.some(d => d.amount > 0);
+  const hasData = finalData.length > 0 && total > 0;
 
-  const calculatePath = (startAngle: number, endAngle: number, animatedValue: Animated.Value) => {
-    const startRad = startAngle * (Math.PI / 180);
-    const endRad = endAngle * (Math.PI / 180);
-
-    const startX = centerX + radius * Math.cos(startRad);
-    const startY = centerY + radius * Math.sin(startRad);
-    const endX = centerX + radius * Math.cos(endRad);
-    const endY = centerY + radius * Math.sin(endRad);
-
-    const innerStartX = centerX + innerRadius * Math.cos(startRad);
-    const innerStartY = centerY + innerRadius * Math.sin(startRad);
-    const innerEndX = centerX + innerRadius * Math.cos(endRad);
-    const innerEndY = centerY + innerRadius * Math.sin(endRad);
-
-    const largeArcFlag = endAngle - startAngle > 180 ? '1' : '0';
-
-    // Animated path calculation
-    const animatedEndRad = animatedValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [startRad, endRad],
-    });
-
-    const animatedEndX = animatedEndRad.interpolate({
-      inputRange: [startRad, endRad],
-      outputRange: [centerX + radius * Math.cos(startRad), centerX + radius * Math.cos(endRad)],
-    });
-    const animatedEndY = animatedEndRad.interpolate({
-      inputRange: [startRad, endRad],
-      outputRange: [centerY + radius * Math.sin(startRad), centerY + radius * Math.sin(endRad)],
-    });
-
-    const animatedInnerEndX = animatedEndRad.interpolate({
-      inputRange: [startRad, endRad],
-      outputRange: [centerX + innerRadius * Math.cos(startRad), centerX + innerRadius * Math.cos(endRad)],
-    });
-    const animatedInnerEndY = animatedEndRad.interpolate({
-      inputRange: [startRad, endRad],
-      outputRange: [centerY + innerRadius * Math.sin(startRad), centerY + innerRadius * Math.sin(endRad)],
-    });
-
-    return `M ${innerStartX} ${innerStartY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} L ${innerEndX} ${innerEndY} A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStartX} ${innerStartY} Z`;
+  const arcPath = (startAngle: number, endAngle: number): string => {
+    const toRad = (a: number) => (a - 90) * (Math.PI / 180);
+    const sR = toRad(startAngle);
+    const eR = toRad(endAngle);
+    const sx = cx + radius * Math.cos(sR);
+    const sy = cy + radius * Math.sin(sR);
+    const ex = cx + radius * Math.cos(eR);
+    const ey = cy + radius * Math.sin(eR);
+    const isx = cx + innerRadius * Math.cos(sR);
+    const isy = cy + innerRadius * Math.sin(sR);
+    const iex = cx + innerRadius * Math.cos(eR);
+    const iey = cy + innerRadius * Math.sin(eR);
+    const large = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${isx} ${isy} L ${sx} ${sy} A ${radius} ${radius} 0 ${large} 1 ${ex} ${ey} L ${iex} ${iey} A ${innerRadius} ${innerRadius} 0 ${large} 0 ${isx} ${isy} Z`;
   };
 
   useEffect(() => {
-    if (hasData) {
-      const totalAngle = 360;
-      let currentAngle = 0;
-      const newAnimatedPaths = finalData.map((_, index) => new Animated.Value(0));
-      setAnimatedPaths(newAnimatedPaths);
+    if (!hasData) { setPathData([]); return; }
 
-      const segmentAngles = finalData.map(item => (item.amount / total) * totalAngle);
+    let angle = 0;
+    const newPaths = finalData.map((item, index) => {
+      const pct = (item.amount / total) * 100;
+      const sweep = (item.amount / total) * 360;
+      const gap = finalData.length > 1 ? 1 : 0;
+      const startAngle = angle + gap / 2;
+      const endAngle = angle + sweep - gap / 2;
+      angle += sweep;
+      const anim = animValues[index] ?? new Animated.Value(0);
+      if (!animValues[index]) animValues[index] = anim;
+      return { path: arcPath(startAngle, endAngle), color: item.color, categoryId: item.categoryId, label: item.label, icon: item.icon, percentage: pct, animVal: anim };
+    });
+    setPathData(newPaths);
 
-      const newPathData = finalData.map((item, index) => {
-        const startAngle = currentAngle;
-        const endAngle = currentAngle + segmentAngles[index];
-        currentAngle = endAngle;
-        return {
-          ...item,
-          startAngle,
-          endAngle,
-          path: calculatePath(startAngle, endAngle, newAnimatedPaths[index]),
-        };
-      });
-      setPathData(newPathData);
-
-      // Animate paths on mount
-      newAnimatedPaths.forEach((animValue, index) => {
-        Animated.timing(animValue, {
-          toValue: 1,
-          duration: 500 + index * 100, // Stagger animation
-          useNativeDriver: false, // Path animation often requires false
-        }).start();
-      });
-    } else {
-      setAnimatedPaths([]);
-      setPathData([]);
-    }
+    newPaths.forEach((p, i) => {
+      p.animVal.setValue(0);
+      Animated.timing(p.animVal, { toValue: 1, duration: 400 + i * 80, useNativeDriver: false }).start();
+    });
   }, [data, total, hasData]);
 
-  const renderLegendItem = (item: typeof finalData[0]) => (
-    <View key={item.categoryId} style={styles.legendItem}>
-      <View style={[styles.legendIcon, { backgroundColor: item.color }]} />
-      <Text style={[styles.legendLabel, { color: textColor }]}>{item.label}</Text>
-      <Text style={[styles.legendPercentage, { color: labelColor }]}>{item.percentage.toFixed(1)}%</Text>
-    </View>
-  );
-
-  const renderSvgContent = () => {
-    if (!hasData) {
-      return (
-        <SvgText
-          x={centerX.toString()}
-          y={(centerY + 10).toString()} // Adjust Y for centering
-          textAnchor="middle"
-          fill={labelColor}
-          fontSize="14"
-          fontWeight="bold"
-        >
-          {noDataText}
-        </SvgText>
-      );
-    }
-
-    const paths = pathData.map((item, index) => (
-      <AnimatedPath
-        key={item.categoryId}
-        d={item.path}
-        fill={item.color}
-        strokeWidth={strokeWidth}
-        stroke={backgroundColor}
-        opacity={animatedPaths[index]?.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 1],
-        })}
-      />
-    ));
-
-    return (
-      <>
-        {paths}
-        {/* Center Text */}
-        <SvgText
-          x={centerX.toString()}
-          y={(centerY - 10).toString()}
-          textAnchor="middle"
-          fill={textColor}
-          fontSize="18"
-          fontFamily="SpaceMono-Regular"
-        >
-          {total.toLocaleString('fr-FR')} {currencySymbol}
-        </SvgText>
-        <SvgText
-          x={centerX.toString()}
-          y={(centerY + 15).toString()}
-          textAnchor="middle"
-          fill={labelColor}
-          fontSize="12"
-        >
-          Dépenses
-        </SvgText>
-      </>
-    );
-  };
+  const formatAmount = (n: number) => n.toLocaleString('fr-FR');
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
-      <Svg height={svgSize} width={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
-        {renderSvgContent()}
+      <Svg height={size} width={size} viewBox={`0 0 ${size} ${size}`}>
+        {!hasData ? (
+          <SvgText x={(cx).toString()} y={(cy + 5).toString()} textAnchor="middle" fill={labelColor} fontSize="13">
+            Aucune dépense
+          </SvgText>
+        ) : (
+          <>
+            {pathData.map(p => (
+              <AnimatedPath
+                key={p.categoryId}
+                d={p.path}
+                fill={p.color}
+                opacity={p.animVal}
+                stroke={backgroundColor}
+                strokeWidth="2"
+              />
+            ))}
+            <SvgText x={cx.toString()} y={(cy - 8).toString()} textAnchor="middle" fill={textColor} fontSize="15" fontFamily="SpaceMono-Regular">
+              {formatAmount(total)}
+            </SvgText>
+            <SvgText x={cx.toString()} y={(cy + 10).toString()} textAnchor="middle" fill={textColor} fontSize="11" fontFamily="SpaceMono-Regular">
+              {currencySymbol}
+            </SvgText>
+            <SvgText x={cx.toString()} y={(cy + 26).toString()} textAnchor="middle" fill={labelColor} fontSize="10">
+              Dépenses
+            </SvgText>
+          </>
+        )}
       </Svg>
-
-      <View style={styles.legendContainer}>
-        {finalData.map(renderLegendItem)}
+      <View style={styles.legend}>
+        {pathData.map(p => (
+          <View key={p.categoryId} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: p.color }]} />
+            <Text style={styles.legendIcon}>{p.icon}</Text>
+            <Text style={styles.legendLabel} numberOfLines={1}>{p.label}</Text>
+            <Text style={styles.legendPct}>{p.percentage.toFixed(1)}%</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: 300, // Match containerWidth
-    height: 400, // Adjust height to accommodate SVG and legend
-    borderRadius: 12,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  legendContainer: {
-    flex: 1,
-    width: '100%',
-    marginTop: 15,
-    paddingLeft: 10, // Add some padding for alignment
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    justifyContent: 'space-between', // Space out icon, label, and percentage
-    paddingRight: 10, // Padding for percentage
-  },
-  legendIcon: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  legendLabel: {
-    fontSize: 14,
-    flexShrink: 1, // Allow label to shrink if too long
-    marginRight: 5,
-  },
-  legendPercentage: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
+  container: { borderRadius: 12, alignItems: 'center', padding: 16 },
+  legend: { width: '100%', marginTop: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingHorizontal: 4 },
+  legendDot: { width: 12, height: 12, borderRadius: 6, marginRight: 6, flexShrink: 0 },
+  legendIcon: { fontSize: 14, marginRight: 4, flexShrink: 0 },
+  legendLabel: { flex: 1, fontSize: 13, color: '#F0EFF8', fontFamily: 'Sora-Regular' },
+  legendPct: { fontSize: 12, color: '#888899', fontFamily: 'SpaceMono-Regular', marginLeft: 4 },
 });
 
 export default DonutChart;

@@ -3,141 +3,112 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { G, Rect, Text as SvgText, Line } from 'react-native-svg';
 
 interface BarChartProps {
-  data: { month: string; income: number; expense: number }[];
+  data: { label: string; income: number; expense: number }[];
   height?: number;
 }
 
 const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
   const chartHeight = height;
   const screenWidth = Dimensions.get('window').width;
-  const chartWidth = screenWidth - 64; // 32px padding each side
-  const barWidth = 15;
-  const groupSpacing = 30;
-  const legendHeight = 40;
-  const gridLineCount = 3;
+  const horizontalPadding = 48;
+  const chartWidth = screenWidth - 64;
+  const svgWidth = chartWidth;
+  const drawWidth = svgWidth - horizontalPadding;
+  const barGroupWidth = data.length > 0 ? drawWidth / data.length : 40;
+  const barWidth = Math.min(Math.max(barGroupWidth * 0.3, 6), 20);
+  const gridLineCount = 4;
+  const legendHeight = 36;
   const backgroundColor = '#1A1A24';
-  const cornerRadius = 12;
   const incomeColor = '#4ECDC4';
   const expenseColor = '#7C6FFF';
   const gridLineColor = '#2A2A3A';
   const textColor = '#FFFFFF';
   const labelColor = '#888899';
+  const drawHeight = chartHeight - 40;
 
-  const monthLabels: { [key: string]: string } = {
-    'January': 'JAN',
-    'February': 'FÉV',
-    'March': 'MAR',
-    'April': 'AVR',
-    'May': 'MAI',
-    'June': 'JUN',
-    'July': 'JUL',
-    'August': 'AOÛ',
-    'September': 'SEP',
-    'October': 'OCT',
-    'November': 'NOV',
-    'December': 'DÉC',
-  };
+  const maxValue = useMemo(() => {
+    if (!data || data.length === 0) return 1;
+    return Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
+  }, [data]);
 
-  const processedData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+  const hasData = data.some(d => d.income > 0 || d.expense > 0);
 
-    const months = data.map(d => monthLabels[d.month] || d.month.substring(0, 3).toUpperCase());
-    const allValues = data.flatMap(d => [d.income, d.expense]);
-    const maxValue = Math.max(...allValues, 1); // Ensure maxValue is at least 1 to avoid division by zero
-
-    return data.map((item, index) => ({
-      month: months[index],
-      income: item.income,
-      expense: item.expense,
-      normalizedIncome: (item.income / maxValue) * (chartHeight - 50), // -50 for padding and labels
-      normalizedExpense: (item.expense / maxValue) * (chartHeight - 50),
-    }));
-  }, [data, chartHeight]);
-
-  const hasData = processedData.some(d => d.income > 0 || d.expense > 0);
-
-  const gridLines = Array.from({ length: gridLineCount }).map((_, i) => {
-    const y = (chartHeight - 50) * (1 - (i + 1) / (gridLineCount + 1));
+  const gridLines = Array.from({ length: gridLineCount }, (_, i) => {
+    const y = drawHeight * (1 - (i + 1) / (gridLineCount + 1));
+    const value = Math.round(maxValue * (i + 1) / (gridLineCount + 1));
+    const label = value >= 1000 ? `${Math.round(value / 1000)}k` : String(value);
     return (
-      <Line
-        key={`grid-${i}`}
-        x1="0"
-        y1={y.toString()}
-        x2={chartWidth.toString()}
-        y2={y.toString()}
-        stroke={gridLineColor}
-        strokeDasharray="4,4"
-      />
+      <G key={`grid-${i}`}>
+        <Line
+          x1={horizontalPadding.toString()}
+          y1={y.toString()}
+          x2={svgWidth.toString()}
+          y2={y.toString()}
+          stroke={gridLineColor}
+          strokeDasharray="4,4"
+          strokeWidth="1"
+        />
+        <SvgText
+          x={(horizontalPadding - 4).toString()}
+          y={(y + 4).toString()}
+          fill={labelColor}
+          fontSize="9"
+          textAnchor="end"
+        >
+          {label}
+        </SvgText>
+      </G>
     );
   });
 
-  const bars = processedData.map((item, index) => {
-    const x = index * groupSpacing + groupSpacing / 2;
-    const barGroupHeight = chartHeight - 50;
+  const bars = data.map((item, index) => {
+    const groupCenterX = horizontalPadding + barGroupWidth * index + barGroupWidth / 2;
+    const incomH = (item.income / maxValue) * drawHeight;
+    const expensH = (item.expense / maxValue) * drawHeight;
+    const gap = barWidth * 0.3;
 
     return (
-      <React.Fragment key={index}>
-        {/* Income Bar */}
+      <G key={index}>
         <Rect
-          x={(x - barWidth / 2).toString()}
-          y={(barGroupHeight - item.normalizedIncome).toString()}
+          x={(groupCenterX - gap / 2 - barWidth).toString()}
+          y={(drawHeight - incomH).toString()}
           width={barWidth.toString()}
-          height={item.normalizedIncome.toString()}
+          height={Math.max(incomH, 0).toString()}
           fill={incomeColor}
-          rx="4"
-          ry="4"
+          rx="3"
+          ry="3"
         />
-        {/* Expense Bar */}
         <Rect
-          x={(x + barWidth / 2).toString()}
-          y={(barGroupHeight - item.normalizedExpense).toString()}
+          x={(groupCenterX + gap / 2).toString()}
+          y={(drawHeight - expensH).toString()}
           width={barWidth.toString()}
-          height={item.normalizedExpense.toString()}
+          height={Math.max(expensH, 0).toString()}
           fill={expenseColor}
-          rx="4"
-          ry="4"
+          rx="3"
+          ry="3"
         />
-        {/* Month Label */}
         <SvgText
-          x={x.toString()}
-          y={(chartHeight - 15).toString()}
+          x={groupCenterX.toString()}
+          y={(drawHeight + 16).toString()}
           fill={labelColor}
-          fontSize="12"
+          fontSize="9"
           textAnchor="middle"
           fontWeight="bold"
         >
-          {item.month}
+          {item.label}
         </SvgText>
-      </React.Fragment>
+      </G>
     );
   });
 
   return (
-    <View style={[styles.container, { height: chartHeight + legendHeight, backgroundColor }]}>
-      <Svg height={chartHeight} width={chartWidth} viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
-        {/* Background with rounded corners */}
-        <Rect
-          x="0"
-          y="0"
-          width={chartWidth.toString()}
-          height={chartHeight.toString()}
-          fill={backgroundColor}
-          rx={cornerRadius.toString()}
-          ry={cornerRadius.toString()}
-        />
-
-        {/* Grid Lines */}
-        <G transform="translate(20, 20)">
+    <View style={[styles.container, { backgroundColor }]}>
+      <Svg height={chartHeight} width={svgWidth} viewBox={`0 0 ${svgWidth} ${chartHeight}`}>
+        <G transform="translate(0, 10)">
           {gridLines}
           {bars}
         </G>
-
-        {/* Y-axis labels (optional, for reference) */}
-        <SvgText x="5" y="25" fill={labelColor} fontSize="10">MAX</SvgText>
-        <SvgText x="5" y={(chartHeight - 35).toString()} fill={labelColor} fontSize="10">0</SvgText>
       </Svg>
-
-      {/* Legend */}
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: incomeColor }]} />
@@ -148,7 +119,6 @@ const BarChart: React.FC<BarChartProps> = ({ data, height = 180 }) => {
           <Text style={[styles.legendText, { color: textColor }]}>Dépenses</Text>
         </View>
       </View>
-
       {!hasData && (
         <View style={styles.noDataOverlay}>
           <Text style={styles.noDataText}>Aucune donnée</Text>
@@ -163,49 +133,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 20, // Space for Y-axis labels
-    paddingBottom: 20, // Space for X-axis labels
-    paddingHorizontal: 20, // Horizontal padding for bars
+    paddingBottom: 8,
   },
   legendContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
-    width: '100%',
+    paddingBottom: 8,
+    gap: 16,
   },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 15,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 5,
-  },
-  legendText: {
-    fontSize: 12,
-  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontSize: 12, fontFamily: 'Sora-Regular' },
   noDataOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(26, 26, 36, 0.8)', // Slightly transparent background
-    borderRadius: 12,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(26, 26, 36, 0.8)', borderRadius: 12,
   },
-  noDataText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  noDataText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
 });
 
 export default BarChart;

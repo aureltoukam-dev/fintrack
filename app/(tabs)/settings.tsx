@@ -9,8 +9,10 @@ import { openDatabase } from '../../db/migrations';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useBudgetStore } from '../../stores/budgetStore';
+import { useAuthStore } from '../../stores/authStore';
 import { exportToJSON, importFromJSON, exportToCSV } from '../../services/exportService';
 import { CURRENCIES, useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
+import PinSetup from '../../components/PinSetup';
 
 const db = openDatabase();
 
@@ -74,7 +76,10 @@ export default function SettingsScreen() {
   const store = useSettingsStore();
   const { transactions, loadTransactions } = useTransactionStore();
   const { budgets, loadBudgets } = useBudgetStore();
+  const { isPinEnabled, isBiometricEnabled, isBiometricAvailable, removePin, setBiometricEnabled } = useAuthStore();
   const [resetModal, setResetModal] = useState(false);
+  const [pinSetupModal, setPinSetupModal] = useState(false);
+  const [pinMode, setPinMode] = useState<'setup' | 'change'>('setup');
 
   useEffect(() => { store.loadSettings(db); }, []);
 
@@ -114,6 +119,23 @@ export default function SettingsScreen() {
     loadBudgets(db);
     Alert.alert('Réinitialisation', 'Toutes les données ont été supprimées.');
     setResetModal(false);
+  };
+
+  const handleTogglePin = () => {
+    if (isPinEnabled) {
+      Alert.alert('Désactiver le PIN', 'Voulez-vous supprimer le code PIN ?', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => removePin() },
+      ]);
+    } else {
+      setPinMode('setup');
+      setPinSetupModal(true);
+    }
+  };
+
+  const handleChangePin = () => {
+    setPinMode('change');
+    setPinSetupModal(true);
   };
 
   return (
@@ -202,6 +224,40 @@ export default function SettingsScreen() {
         </Row>
       </Section>
 
+      {/* Sécurité */}
+      <Section title="Sécurité" styles={styles}>
+        <Row label="Code PIN" styles={styles}>
+          <Switch
+            value={isPinEnabled}
+            onValueChange={handleTogglePin}
+            trackColor={{ false: C.surface3, true: C.accent }}
+            thumbColor="#FFF"
+          />
+        </Row>
+        {isPinEnabled && (
+          <TouchableOpacity style={styles.actionBtn} onPress={handleChangePin}>
+            <Feather name="edit-2" size={18} color={C.accent} />
+            <Text style={[styles.actionText, { color: C.accent }]}>Modifier le PIN</Text>
+          </TouchableOpacity>
+        )}
+        {isBiometricAvailable && (
+          <Row label="Déverrouillage biométrique" styles={styles}>
+            <Switch
+              value={isBiometricEnabled}
+              onValueChange={v => {
+                if (v && !isPinEnabled) {
+                  Alert.alert('PIN requis', 'Activez d\'abord le code PIN pour utiliser la biométrie.');
+                  return;
+                }
+                setBiometricEnabled(v);
+              }}
+              trackColor={{ false: C.surface3, true: C.accent }}
+              thumbColor="#FFF"
+            />
+          </Row>
+        )}
+      </Section>
+
       {/* Catégories */}
       <Section title="Catégories" styles={styles}>
         <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/categories')}>
@@ -236,6 +292,15 @@ export default function SettingsScreen() {
         <Text style={styles.infoText}>FinTrack v1.0.0 • 100% hors ligne ✓</Text>
         <Text style={styles.infoText}>Données stockées uniquement sur cet appareil</Text>
       </View>
+
+      {/* PIN Setup Modal */}
+      <Modal visible={pinSetupModal} animationType="slide">
+        <PinSetup
+          mode={pinMode}
+          onDone={() => setPinSetupModal(false)}
+          onCancel={() => setPinSetupModal(false)}
+        />
+      </Modal>
 
       {/* Reset Modal */}
       <Modal visible={resetModal} transparent animationType="fade">

@@ -42,7 +42,8 @@
           "color": "#7C6FFF"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

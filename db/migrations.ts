@@ -54,6 +54,29 @@ export const runMigrations = (database: SQLite.SQLiteDatabase) => {
     CREATE INDEX IF NOT EXISTS idx_budgets_month ON budgets (month);
   `);
 
+  // Migration v2: allow multiple budgets per category (one recurring + one per month)
+  const { user_version: dbVersion } = database.getFirstSync('PRAGMA user_version') as { user_version: number };
+  if (dbVersion < 2) {
+    database.execSync(`
+      CREATE TABLE budgets_v2 (
+        id TEXT PRIMARY KEY,
+        categoryId TEXT NOT NULL,
+        limit_amount REAL NOT NULL CHECK(limit_amount > 0),
+        month TEXT
+      );
+    `);
+    database.execSync(`INSERT OR IGNORE INTO budgets_v2 SELECT * FROM budgets;`);
+    database.execSync(`DROP TABLE budgets;`);
+    database.execSync(`ALTER TABLE budgets_v2 RENAME TO budgets;`);
+    database.execSync(`
+      CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets (categoryId);
+      CREATE INDEX IF NOT EXISTS idx_budgets_month ON budgets (month);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_budgets_recurring ON budgets (categoryId) WHERE month IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_budgets_monthly ON budgets (categoryId, month) WHERE month IS NOT NULL;
+    `);
+    database.runSync('PRAGMA user_version = 2');
+  }
+
   const defaults: [string, string][] = [
     ['currency', 'XAF'],
     ['theme', 'dark'],

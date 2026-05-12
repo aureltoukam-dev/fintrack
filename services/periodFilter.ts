@@ -102,6 +102,8 @@ export const getPeriodDates = (
 };
 
 const MONTH_LABELS = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUN', 'JUL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
+export const MONTH_FULL = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
 export const getLast6Months = (): { monthNum: string; year: number; label: string }[] => {
   const result = [];
@@ -191,6 +193,55 @@ export const formatCurrency = (amount: number, currency: string, locale: string)
     style: 'currency',
     currency: currency,
   }).format(amount);
+};
+
+// Navigate to a specific period by offset (0 = current, -1 = previous, etc.)
+export const getOffsetPeriodDates = (
+  period: 'week' | 'month' | 'quarter' | 'year',
+  offset: number
+): { startDate: string; endDate: string; label: string; monthKey: string } => {
+  const today = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (period === 'week') {
+    const start = getStartOfWeek(today);
+    start.setDate(start.getDate() + offset * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const s = start, e = end;
+    const label = s.getMonth() === e.getMonth()
+      ? `${s.getDate()} – ${e.getDate()} ${MONTH_FULL[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`
+      : `${s.getDate()} ${MONTH_FULL[s.getMonth()].slice(0, 3)} – ${e.getDate()} ${MONTH_FULL[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
+    return { startDate: iso(start), endDate: iso(end), label, monthKey: `${end.getFullYear()}-${pad(end.getMonth() + 1)}` };
+  }
+
+  if (period === 'month') {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const label = `${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
+    const monthKey = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    return { startDate: iso(start), endDate: iso(end), label, monthKey };
+  }
+
+  if (period === 'quarter') {
+    const currentQ = Math.floor(today.getMonth() / 3);
+    const totalQ = today.getFullYear() * 4 + currentQ + offset;
+    const targetYear = Math.floor(totalQ / 4);
+    const q = ((totalQ % 4) + 4) % 4;
+    const startMonth = q * 3;
+    const start = new Date(targetYear, startMonth, 1);
+    const end = new Date(targetYear, startMonth + 3, 0);
+    const label = `T${q + 1} ${targetYear}`;
+    return { startDate: iso(start), endDate: iso(end), label, monthKey: `${targetYear}-${pad(startMonth + 1)}` };
+  }
+
+  // year
+  const targetYear = today.getFullYear() + offset;
+  const start = new Date(targetYear, 0, 1);
+  const end = new Date(targetYear, 11, 31);
+  return { startDate: iso(start), endDate: iso(end), label: String(targetYear), monthKey: `${targetYear}-01` };
 };
 
 export const groupTransactionsByDate = (

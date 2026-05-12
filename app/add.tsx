@@ -9,8 +9,8 @@ import { Feather } from '@expo/vector-icons';
 import { openDatabase } from '../db/migrations';
 import { useTransactionStore } from '../stores/transactionStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useCategoryStore } from '../stores/categoryStore';
 import { getTransactionById } from '../db/queries';
-import { CATEGORIES, getCategoriesByType } from '../constants/categories';
 import NumPad from '../components/NumPad';
 import { DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../constants/theme';
 
@@ -23,6 +23,7 @@ export default function AddScreen() {
 
   const { addTransaction: addTx, updateTransaction: updateTx, loadTransactions } = useTransactionStore();
   const { getCurrencySymbol, loadSettings } = useSettingsStore();
+  const { allCategories } = useCategoryStore();
 
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
@@ -48,7 +49,7 @@ export default function AddScreen() {
     }
   }, [txId]);
 
-  const categories = getCategoriesByType(type);
+  const categories = allCategories.filter(c => (c.type === type || c.type === 'both') && c.isActive);
   const currencySymbol = getCurrencySymbol();
   const parsedAmount = parseFloat(amount) || 0;
   const canSave = parsedAmount > 0 && categoryId;

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -15,6 +15,8 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const { loadCategories } = useCategoryStore();
+  const router = useRouter();
+  const onboardingChecked = useRef(false);
   const [fontsLoaded] = useFonts({
     'Sora-Regular': Sora_400Regular,
     'Sora-SemiBold': Sora_600SemiBold,
@@ -27,6 +29,13 @@ export default function RootLayout() {
       runMigrations(db);
       seedDatabase(db);
       loadCategories(db);
+      if (!onboardingChecked.current) {
+        onboardingChecked.current = true;
+        const row = db.getFirstSync<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['onboarding_done']);
+        if (!row) {
+          setTimeout(() => router.replace('/onboarding'), 100);
+        }
+      }
     } catch (e) {
       console.error('DB init error:', e);
     }
@@ -68,6 +77,10 @@ export default function RootLayout() {
             title: 'Catégories',
             headerStyle: { backgroundColor: '#1A1A24' },
           }}
+        />
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false }}
         />
       </Stack>
     </ErrorBoundary>

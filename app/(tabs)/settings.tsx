@@ -9,7 +9,7 @@ import { openDatabase } from '../../db/migrations';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useBudgetStore } from '../../stores/budgetStore';
-import { exportToJSON, importFromJSON } from '../../services/exportService';
+import { exportToJSON, importFromJSON, exportToCSV } from '../../services/exportService';
 import { CURRENCIES, DARK_COLORS as C, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
 
 const db = openDatabase();
@@ -54,14 +54,21 @@ export default function SettingsScreen() {
 
   const update = (key: string, value: string) => store.updateSetting(db, key, value);
 
-  const handleExport = async () => {
-    const allSettings: Record<string, string> = {};
-    (Object.keys(store) as string[]).forEach(k => {
-      if (typeof (store as any)[k] !== 'function') {
-        allSettings[k] = String((store as any)[k]);
-      }
-    });
+  const handleExportJSON = async () => {
+    const allSettings: Record<string, string> = {
+      currency: store.currency,
+      locale: store.locale,
+      name: store.name,
+      theme: store.theme,
+      dateFormat: store.dateFormat,
+      notifyBudget: String(store.notifyBudget),
+      notifyReminder: String(store.notifyReminder),
+    };
     await exportToJSON(transactions, budgets, allSettings);
+  };
+
+  const handleExportCSV = async () => {
+    await exportToCSV(transactions, []);
   };
 
   const handleImport = async () => {
@@ -180,9 +187,13 @@ export default function SettingsScreen() {
 
       {/* Données */}
       <Section title="Données">
-        <TouchableOpacity style={styles.actionBtn} onPress={handleExport}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleExportJSON}>
           <Feather name="download" size={18} color={C.accent} />
           <Text style={[styles.actionText, { color: C.accent }]}>Exporter JSON</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleExportCSV}>
+          <Feather name="file-text" size={18} color={C.accent} />
+          <Text style={[styles.actionText, { color: C.accent }]}>Exporter CSV</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={handleImport}>
           <Feather name="upload" size={18} color={C.accent2} />

@@ -1,18 +1,27 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, TextInput, Modal, Alert,
+  Switch, TextInput, Modal, Alert, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { openDatabase } from '../../db/migrations';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useBudgetStore } from '../../stores/budgetStore';
 import { useAuthStore } from '../../stores/authStore';
 import { exportToJSON, importFromJSON, exportToCSV } from '../../services/exportService';
+import {
+  requestPermissions,
+  scheduleReminder,
+  cancelReminder,
+  cancelAllBudgetAlerts,
+} from '../../services/notificationService';
 import { CURRENCIES, useTheme, SPACING, TYPOGRAPHY as T, RADIUS } from '../../constants/theme';
 import PinSetup from '../../components/PinSetup';
+
+const BUDGET_THRESHOLDS = [50, 75, 80, 90, 100];
 
 const db = openDatabase();
 
@@ -80,6 +89,7 @@ export default function SettingsScreen() {
   const [resetModal, setResetModal] = useState(false);
   const [pinSetupModal, setPinSetupModal] = useState(false);
   const [pinMode, setPinMode] = useState<'setup' | 'change'>('setup');
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => { store.loadSettings(db); }, []);
 
@@ -119,6 +129,52 @@ export default function SettingsScreen() {
     loadBudgets(db);
     Alert.alert('Réinitialisation', 'Toutes les données ont été supprimées.');
     setResetModal(false);
+  };
+
+  const handleToggleBudgetNotify = async (v: boolean) => {
+    if (v) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert('Permission refusée', 'Activez les notifications dans les paramètres de votre téléphone.');
+        return;
+      }
+    } else {
+      await cancelAllBudgetAlerts();
+    }
+    update('notifyBudget', String(v));
+  };
+
+  const handleToggleReminder = async (v: boolean) => {
+    if (v) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert('Permission refusée', 'Activez les notifications dans les paramètres de votre téléphone.');
+        return;
+      }
+      await scheduleReminder(store.reminderTime);
+    } else {
+      await cancelReminder();
+    }
+    update('notifyReminder', String(v));
+  };
+
+  const handleReminderTimeChange = async (_: any, date?: Date) => {
+    if (Platform.OS === 'android') setShowTimePicker(false);
+    if (!date) return;
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    const time = `${h}:${m}`;
+    update('reminderTime', time);
+    if (store.notifyReminder) {
+      await scheduleReminder(time);
+    }
+  };
+
+  const reminderTimeAsDate = (): Date => {
+    const [h, m] = (store.reminderTime ?? '20:00').split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d;
   };
 
   const handleTogglePin = () => {
@@ -206,22 +262,64 @@ export default function SettingsScreen() {
 
       {/* Notifications */}
       <Section title="Notifications" styles={styles}>
+        {/* Budget alerts */}
         <Row label="Alertes budget" styles={styles}>
           <Switch
             value={store.notifyBudget}
-            onValueChange={v => update('notifyBudget', String(v))}
+            onValueChange={handleToggleBudgetNotify}
             trackColor={{ false: C.surface3, true: C.accent }}
             thumbColor="#FFF"
           />
         </Row>
-        <Row label="Rappels quotidiens" styles={styles}>
+        {store.notifyBudget && (
+          <View style={[styles.row, { flexDirection: 'column', alignItems: 'flex-start', gap: SPACING.sm }]}>
+            <Text style={styles.rowLabel}>Seuil d'alerte</Text>
+            <View style={styles.chips}>
+              {BUDGET_THRESHOLDS.map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.chip, store.budgetAlertThreshold === t && styles.chipActive]}
+                  onPress={() => update('budgetAlertThreshold', String(t))}
+                >
+                  <Text style={[styles.chipText, store.budgetAlertThreshold === t && styles.chipTextActive]}>
+                    {t}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Daily reminder */}
+        <Row label="Rappel quotidien" styles={styles}>
           <Switch
             value={store.notifyReminder}
-            onValueChange={v => update('notifyReminder', String(v))}
+            onValueChange={handleToggleReminder}
             trackColor={{ false: C.surface3, true: C.accent }}
             thumbColor="#FFF"
           />
         </Row>
+        {store.notifyReminder && (
+          <TouchableOpacity
+            style={[styles.row, { borderBottomWidth: 0 }]}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <Text style={styles.rowLabel}>Heure du rappel</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.xs }}>
+              <Text style={[styles.rowLabel, { color: C.accent }]}>{store.reminderTime}</Text>
+              <Feather name="clock" size={16} color={C.accent} />
+            </View>
+          </TouchableOpacity>
+        )}
+        {showTimePicker && Platform.OS === 'android' && (
+          <DateTimePicker
+            value={reminderTimeAsDate()}
+            mode="time"
+            is24Hour={true}
+            display="default"
+            onChange={handleReminderTimeChange}
+          />
+        )}
       </Section>
 
       {/* Sécurité */}
@@ -292,6 +390,32 @@ export default function SettingsScreen() {
         <Text style={styles.infoText}>FinTrack v1.0.0 • 100% hors ligne ✓</Text>
         <Text style={styles.infoText}>Données stockées uniquement sur cet appareil</Text>
       </View>
+
+      {/* iOS Time Picker Modal */}
+      {Platform.OS === 'ios' && (
+        <Modal visible={showTimePicker} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalBox, { paddingBottom: SPACING.lg }]}>
+              <Text style={[styles.modalTitle, { marginBottom: SPACING.lg }]}>Heure du rappel</Text>
+              <DateTimePicker
+                value={reminderTimeAsDate()}
+                mode="time"
+                is24Hour={true}
+                display="spinner"
+                onChange={handleReminderTimeChange}
+                themeVariant={store.theme === 'light' ? 'light' : 'dark'}
+                style={{ height: 150 }}
+              />
+              <TouchableOpacity
+                style={[styles.modalBtn, { alignSelf: 'center', marginTop: SPACING.md, backgroundColor: C.accent }]}
+                onPress={() => setShowTimePicker(false)}
+              >
+                <Text style={{ color: '#FFF', fontFamily: T.fonts.semibold }}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* PIN Setup Modal */}
       <Modal visible={pinSetupModal} animationType="slide">

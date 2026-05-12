@@ -16,8 +16,10 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useAuthStore } from '../stores/authStore';
 import { ThemeContext, useThemeColors } from '../constants/theme';
 import LockScreen from '../components/LockScreen';
+import { setupNotificationHandler } from '../services/notificationService';
 
 SplashScreen.preventAutoHideAsync();
+setupNotificationHandler();
 
 export default function RootLayout() {
   const { loadCategories } = useCategoryStore();

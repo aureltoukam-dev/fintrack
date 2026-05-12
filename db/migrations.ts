@@ -82,7 +82,9 @@ export const runMigrations = (database: SQLite.SQLiteDatabase) => {
     ['theme', 'dark'],
     ['locale', 'fr-FR'],
     ['notifyBudget', 'true'],
+    ['budgetAlertThreshold', '80'],
     ['notifyReminder', 'false'],
+    ['reminderTime', '20:00'],
     ['name', ''],
     ['dateFormat', 'DD/MM/YYYY'],
   ];

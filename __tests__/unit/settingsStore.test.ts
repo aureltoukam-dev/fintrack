@@ -89,10 +89,10 @@ describe('settingsStore loadSettings', () => {
     expect(state.notifyReminder).toBe(false);
   });
 
-  test('invalid budgetAlertThreshold string "abc" results in NaN — bug', () => {
+  test('invalid budgetAlertThreshold string "abc" falls back to default 80 (fix: bug 4)', () => {
     const state = loadStore({ budgetAlertThreshold: 'abc' });
-    // parseInt('abc', 10) returns NaN — should fall back to default 80
-    expect(Number.isNaN(state.budgetAlertThreshold)).toBe(true); // BUG confirmed
+    expect(state.budgetAlertThreshold).toBe(80);
+    expect(Number.isNaN(state.budgetAlertThreshold)).toBe(false);
   });
 
   test('budgetAlertThreshold "0" is parsed as 0, not the default', () => {

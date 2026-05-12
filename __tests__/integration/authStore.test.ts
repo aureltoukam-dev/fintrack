@@ -137,13 +137,17 @@ describe('lock', () => {
     expect(useAuthStore.getState().isLocked).toBe(true);
   });
 
-  test('lock with biometric only (no PIN) → locked with no PIN fallback (bug)', async () => {
+  test('lock with biometric only (no PIN) → does NOT lock (fix: bug 5)', async () => {
     useAuthStore.setState({ isPinEnabled: false, isBiometricEnabled: true, isLocked: false });
     useAuthStore.getState().lock();
+    // Without PIN there is no fallback, so lock() is a no-op
+    expect(useAuthStore.getState().isLocked).toBe(false);
+  });
+
+  test('lock with PIN + biometric → locks normally', () => {
+    useAuthStore.setState({ isPinEnabled: true, isBiometricEnabled: true, isLocked: false });
+    useAuthStore.getState().lock();
     expect(useAuthStore.getState().isLocked).toBe(true);
-    // No PIN stored → unlockWithPin always fails → user permanently locked out if biometric fails
-    const result = await useAuthStore.getState().unlockWithPin('0000');
-    expect(result).toBe(false); // BUG: no recovery path
   });
 });
 

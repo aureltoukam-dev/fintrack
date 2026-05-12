@@ -6,6 +6,7 @@ import {
   updateTransaction,
   deleteTransaction,
   getTransactions,
+  getTransactionById,
   getPeriodStats,
   getCategoryStats,
 } from '../db/queries';
@@ -58,10 +59,14 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   updateTransaction: (db, id, data) => {
     updateTransaction(db, id, data);
     get().loadTransactions(db);
-    if (data.type === 'expense' && data.date) {
-      const { notifyBudget, budgetAlertThreshold } = useSettingsStore.getState();
-      if (notifyBudget) {
-        const monthKey = data.date.slice(0, 7);
+    const { notifyBudget, budgetAlertThreshold } = useSettingsStore.getState();
+    if (notifyBudget) {
+      // data may be a partial patch — resolve missing type/date from the updated row
+      const row = (!data.type || !data.date) ? getTransactionById(db, id) : null;
+      const type = data.type ?? row?.type;
+      const date = data.date ?? row?.date;
+      if (type === 'expense' && date) {
+        const monthKey = date.slice(0, 7);
         const { allCategories } = useCategoryStore.getState();
         checkAndAlertBudgets(db, monthKey, budgetAlertThreshold, allCategories).catch(() => {});
       }

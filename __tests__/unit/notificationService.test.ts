@@ -111,15 +111,40 @@ describe('checkAndAlertBudgets', () => {
     expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
-  test('endDate uses hardcoded "31" for all months — invalid for 30-day months (bug)', async () => {
+  test('endDate uses the actual last day of the month (fix: bug 1)', async () => {
     const { getBudgets, getCategoryStats } = require('../../db/queries');
     (getBudgets as jest.Mock).mockReturnValue([{ id: 'b-apr', categoryId: 'cat-food', limit: 100 }]);
     (getCategoryStats as jest.Mock).mockReturnValue([]);
 
     await checkAndAlertBudgets(mockDb, '2025-04', 80, allCategories); // April = 30 days
-    // Expected: getCategoryStats called with invalid date '2025-04-31'
-    expect(getCategoryStats).toHaveBeenCalledWith(mockDb, '2025-04-01', '2025-04-31', 'expense');
-    // BUG: '2025-04-31' is not a real date — should be '2025-04-30'
+    expect(getCategoryStats).toHaveBeenCalledWith(mockDb, '2025-04-01', '2025-04-30', 'expense');
+  });
+
+  test('endDate for February is 28 (non-leap year)', async () => {
+    const { getBudgets, getCategoryStats } = require('../../db/queries');
+    (getBudgets as jest.Mock).mockReturnValue([{ id: 'b-feb', categoryId: 'cat-food', limit: 100 }]);
+    (getCategoryStats as jest.Mock).mockReturnValue([]);
+
+    await checkAndAlertBudgets(mockDb, '2025-02', 80, allCategories);
+    expect(getCategoryStats).toHaveBeenCalledWith(mockDb, '2025-02-01', '2025-02-28', 'expense');
+  });
+
+  test('endDate for February is 29 (leap year 2024)', async () => {
+    const { getBudgets, getCategoryStats } = require('../../db/queries');
+    (getBudgets as jest.Mock).mockReturnValue([{ id: 'b-leap', categoryId: 'cat-food', limit: 100 }]);
+    (getCategoryStats as jest.Mock).mockReturnValue([]);
+
+    await checkAndAlertBudgets(mockDb, '2024-02', 80, allCategories);
+    expect(getCategoryStats).toHaveBeenCalledWith(mockDb, '2024-02-01', '2024-02-29', 'expense');
+  });
+
+  test('endDate for 31-day month stays 31', async () => {
+    const { getBudgets, getCategoryStats } = require('../../db/queries');
+    (getBudgets as jest.Mock).mockReturnValue([{ id: 'b-jan', categoryId: 'cat-food', limit: 100 }]);
+    (getCategoryStats as jest.Mock).mockReturnValue([]);
+
+    await checkAndAlertBudgets(mockDb, '2025-01', 80, allCategories);
+    expect(getCategoryStats).toHaveBeenCalledWith(mockDb, '2025-01-01', '2025-01-31', 'expense');
   });
 
   test('multiple budgets: only at-threshold fires, below-threshold does not', async () => {

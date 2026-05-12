@@ -94,17 +94,20 @@ describe('budgetStore.updateBudget', () => {
     expect(ub).toHaveBeenCalledWith(mockDb, 'b1', 300);
   });
 
-  test('reloads budgets WITHOUT monthKey after update — state may show stale data (bug)', () => {
+  test('reloads budgets with provided monthKey after update (fix: bug 3)', () => {
     const { getBudgets: gb } = require('../../db/queries');
     const store = freshStore();
 
-    // Simulate: user was viewing May 2026 budgets
-    store.getState().loadBudgets(mockDb, '2026-05');
+    store.getState().updateBudget(mockDb, 'b1', 300, '2026-05');
     expect(gb).toHaveBeenLastCalledWith(mockDb, '2026-05');
+  });
 
-    // After update, reloads without monthKey — now shows ALL budgets
+  test('reloads with undefined when no monthKey passed (backward compat)', () => {
+    const { getBudgets: gb } = require('../../db/queries');
+    const store = freshStore();
+
     store.getState().updateBudget(mockDb, 'b1', 300);
-    expect(gb).toHaveBeenLastCalledWith(mockDb, undefined); // BUG: loses month context
+    expect(gb).toHaveBeenLastCalledWith(mockDb, undefined);
   });
 });
 
@@ -118,11 +121,19 @@ describe('budgetStore.deleteBudget', () => {
     expect(db2).toHaveBeenCalledWith(mockDb, 'b1');
   });
 
-  test('reloads without monthKey after delete — same bug as updateBudget', () => {
+  test('reloads budgets with provided monthKey after delete (fix: bug 3)', () => {
     const { getBudgets: gb } = require('../../db/queries');
     const store = freshStore();
-    store.getState().loadBudgets(mockDb, '2026-05');
+
+    store.getState().deleteBudget(mockDb, 'b1', '2026-05');
+    expect(gb).toHaveBeenLastCalledWith(mockDb, '2026-05');
+  });
+
+  test('reloads with undefined when no monthKey passed (backward compat)', () => {
+    const { getBudgets: gb } = require('../../db/queries');
+    const store = freshStore();
+
     store.getState().deleteBudget(mockDb, 'b1');
-    expect(gb).toHaveBeenLastCalledWith(mockDb, undefined); // BUG
+    expect(gb).toHaveBeenLastCalledWith(mockDb, undefined);
   });
 });
